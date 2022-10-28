@@ -2,6 +2,10 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
+import Fastify from 'fastify';
+import * as api from './api';
+
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -20,6 +24,28 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	context.subscriptions.push(disposable);
+
+	const fastify = Fastify({
+		logger: true
+	});
+
+	// Define a simple endpoint
+	fastify.get('/', async (request, reply) => {
+		return { hello: 'world' };
+	});
+
+	api.addRoutes(fastify);
+
+	// Run the server, listening only on loopback interface
+	const start = async () => {
+		try {
+			await fastify.listen({ port: 50773 });
+		} catch (err) {
+			fastify.log.error(err);
+		}
+	};
+	start();
+
 }
 
 // This method is called when your extension is deactivated
