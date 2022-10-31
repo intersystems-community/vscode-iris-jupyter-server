@@ -6,8 +6,14 @@
 
 import * as vscode from 'vscode';
 import { FastifyInstance, FastifyRequest, RawServerDefault, RequestGenericInterface } from 'fastify';
+import { IRISConnection } from './iris';
 
 // Server Manager interfaces
+
+export interface ISuperServerSpec {
+	host?: string;
+	port: number;
+}
 
 export interface IWebServerSpec {
 	scheme?: string;
@@ -19,12 +25,19 @@ export interface IWebServerSpec {
 export interface IServerSpec {
 	name: string;
 	webServer: IWebServerSpec;
+	superServer?: ISuperServerSpec;
 	username?: string;
 	password?: string;
 	description?: string;
 }
 
 // Our interfaces
+
+export interface ITarget {
+	server: string,
+	namespace: string,
+	serverSpec?: IServerSpec
+}
 
 interface IRequestGeneric extends RequestGenericInterface {
 	Params: {
@@ -34,20 +47,20 @@ interface IRequestGeneric extends RequestGenericInterface {
 	Body: string
 }
 
-interface ITarget {
-	server: string,
-	namespace: string,
-	serverSpec?: IServerSpec
-}
-
 // The Server Manager API handle
 let serverManagerApi: any;
+
+let serverSpecMap: Map<string, IServerSpec>;
 
 async function getTarget(serverNamespace: string): Promise<ITarget> {
 	const parts = serverNamespace.split(':');
 	const namespace = parts[1].toUpperCase();
 	if (parts.length === 2) {
 		const serverName = parts[0].toLowerCase();
+		let serverSpec = serverSpecMap.get(serverName);
+		if (serverSpec) {
+			return { server: serverName, namespace, serverSpec };
+		}
 		if (typeof serverManagerApi === 'undefined') {
 			const SERVER_MANAGER_ID = 'intersystems-community.servermanager';
 			let extension = vscode.extensions.getExtension(SERVER_MANAGER_ID);
@@ -65,7 +78,10 @@ async function getTarget(serverNamespace: string): Promise<ITarget> {
 			serverManagerApi = extension.exports;
 		}
 		if (serverManagerApi && serverManagerApi.getServerSpec) {
-			const serverSpec = await serverManagerApi.getServerSpec(serverName);
+			serverSpec = await serverManagerApi.getServerSpec(serverName);
+			if (!serverSpec) {
+				return { server: serverName, namespace };
+			}
 			const AUTHENTICATION_PROVIDER = 'intersystems-server-credentials';
 			if (typeof serverSpec.password === 'undefined') {
 			  const scopes = [serverSpec.name, serverSpec.username || ''];
@@ -78,6 +94,7 @@ async function getTarget(serverNamespace: string): Promise<ITarget> {
 				serverSpec.password = session.accessToken;
 			  }
 			}
+			serverSpecMap.set(serverName, serverSpec);
 			return { server: serverName, namespace, serverSpec };
 		  }
 		return { server: serverName, namespace };
@@ -86,6 +103,8 @@ async function getTarget(serverNamespace: string): Promise<ITarget> {
 }
 
 export async function addRoutes(fastify:FastifyInstance) {
+
+	serverSpecMap = new Map<string, IServerSpec>;
 
 	fastify.get('/:serverNamespace/hub/api', async (request: FastifyRequest<IRequestGeneric>, reply) => {
 		const { serverNamespace } = request.params;
@@ -124,8 +143,16 @@ export async function addRoutes(fastify:FastifyInstance) {
 		return {"info": `TODO: Successfully logged out of ${serverNamespace}.`};
 	});
 
+
 	fastify.get('/:serverNamespace/api/kernelspecs', async (request: FastifyRequest<IRequestGeneric>, reply) => {
-		const { server, namespace } = await getTarget(request.params.serverNamespace);
+		const target = await getTarget(request.params.serverNamespace);
+		if (!target?.serverSpec) {
+			reply.code(400);
+			return {};
+		}
+		const irisConn = new IRISConnection(target);
+
+		const { server, namespace } = target;
 		return {
 			"default": "iris-polyglot",
 			"kernelspecs": {
