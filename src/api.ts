@@ -5,7 +5,8 @@
 // the target is a Jupyter Hub. See https://github.com/microsoft/vscode-jupyter/blob/d52654ed850fba4ff241b4aa2e9f62cb082b3f71/src/kernels/jupyter/launcher/jupyterPasswordConnect.ts#L412-L419
 
 import * as vscode from 'vscode';
-import { FastifyInstance, FastifyRequest, RawServerDefault, RequestGenericInterface } from 'fastify';
+import * as serverManager from '@intersystems-community/intersystems-servermanager';
+import { FastifyInstance, FastifyRequest, RequestGenericInterface } from 'fastify';
 import { IRISConnection } from './iris';
 
 // Server Manager interfaces
@@ -15,20 +16,8 @@ export interface ISuperServerSpec {
 	port: number;
 }
 
-export interface IWebServerSpec {
-	scheme?: string;
-	host: string;
-	port: number;
-	pathPrefix?: string;
-}
-
-export interface IServerSpec {
-	name: string;
-	webServer: IWebServerSpec;
+export interface IServerSpec extends serverManager.IServerSpec {
 	superServer?: ISuperServerSpec;
-	username?: string;
-	password?: string;
-	description?: string;
 }
 
 // Our interfaces
@@ -62,12 +51,12 @@ async function getTarget(serverNamespace: string): Promise<ITarget> {
 			return { server: serverName, namespace, serverSpec };
 		}
 		if (typeof serverManagerApi === 'undefined') {
-			const SERVER_MANAGER_ID = 'intersystems-community.servermanager';
-			let extension = vscode.extensions.getExtension(SERVER_MANAGER_ID);
+			let extension;
+			extension = vscode.extensions.getExtension(serverManager.EXTENSION_ID);
 			if (!extension) {
 			  // Maybe ask user for permission to install Server Manager
-			  await vscode.commands.executeCommand('workbench.extensions.installExtension', SERVER_MANAGER_ID);
-			  extension = vscode.extensions.getExtension(SERVER_MANAGER_ID);
+			  await vscode.commands.executeCommand('workbench.extensions.installExtension', serverManager.EXTENSION_ID);
+			  extension = vscode.extensions.getExtension(serverManager.EXTENSION_ID);
 			}
 			if (!extension) {
 				return { server: '', namespace: ''};
@@ -82,12 +71,11 @@ async function getTarget(serverNamespace: string): Promise<ITarget> {
 			if (!serverSpec) {
 				return { server: serverName, namespace };
 			}
-			const AUTHENTICATION_PROVIDER = 'intersystems-server-credentials';
 			if (typeof serverSpec.password === 'undefined') {
 			  const scopes = [serverSpec.name, serverSpec.username || ''];
-			  let session = await vscode.authentication.getSession(AUTHENTICATION_PROVIDER, scopes, { silent: true });
+			  let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
 			  if (!session) {
-				session = await vscode.authentication.getSession(AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
+				session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
 			  }
 			  if (session) {
 				serverSpec.username = session.scopes[1];
@@ -198,13 +186,13 @@ export async function addRoutes(fastify:FastifyInstance) {
 
 	fastify.get('/:serverNamespace/api/kernels', async (request: FastifyRequest<IRequestGeneric>, reply) => {
 		// TODO
-		const { server, namespace } = await getTarget(request.params.serverNamespace);
+		//const { server, namespace } = await getTarget(request.params.serverNamespace);
 		return [];
 	});
 
 	fastify.get('/:serverNamespace/api/sessions', async (request: FastifyRequest<IRequestGeneric>, reply) => {
 		// TODO
-		const { server, namespace } = await getTarget(request.params.serverNamespace);
+		//const { server, namespace } = await getTarget(request.params.serverNamespace);
 		return [];
 	});
 
@@ -223,7 +211,8 @@ export async function addRoutes(fastify:FastifyInstance) {
 
 		fastify.post('/:serverNamespace/api/sessions', async (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const { serverNamespace } = request.params;
-			const { server, namespace, serverSpec } = await getTarget(serverNamespace);
+			const target = await getTarget(serverNamespace);
+			const { server, namespace, serverSpec } = target;
 			if (!server) {
 				reply.code(400);
 				return {};
@@ -237,9 +226,13 @@ export async function addRoutes(fastify:FastifyInstance) {
 				return {};
 			}
 			const { kernel, name, type} = payload;
+
+			const irisConn = new IRISConnection(target);
+			const serverVersion = irisConn.iris.getServerVersion();
+
 			reply.code(501);
 			return {
-				"message": `TODO - In '${namespace}' on '${server}' create '${type}' session '${name}' using kernel '${kernel.name}'`,
+				"message": `TODO - In '${namespace}' on '${server}' (${serverVersion}) create '${type}' session '${name}' using kernel '${kernel.name}'`,
 				"short_message": "TODO"
 			};
 		});
