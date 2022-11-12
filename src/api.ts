@@ -5,23 +5,14 @@
 // the target is a Jupyter Hub. See https://github.com/microsoft/vscode-jupyter/blob/d52654ed850fba4ff241b4aa2e9f62cb082b3f71/src/kernels/jupyter/launcher/jupyterPasswordConnect.ts#L412-L419
 
 import * as vscode from 'vscode';
-import * as serverManager from '@intersystems-community/intersystems-servermanager';
 import { FastifyInstance, FastifyRequest, RequestGenericInterface } from 'fastify';
 import { IRISConnection } from './iris';
-
-// Server Manager interfaces
-
-export interface ISuperServerSpec {
-	host?: string;
-	port: number;
-}
-
-export interface IServerSpec extends serverManager.IServerSpec {
-	superServer?: ISuperServerSpec;
-}
+import * as serverManager from '@intersystems-community/intersystems-servermanager';
+import { IServerSpec, Server } from './server';
+import { JupyterServerAPI } from './jupyterServerAPI';
+import { ServerNamespaceMgr } from './serverNamespaceMgr';
 
 // Our interfaces
-
 export interface ITarget {
 	server: string,
 	namespace: string,
@@ -36,63 +27,82 @@ interface IRequestGeneric extends RequestGenericInterface {
 	Body: string
 }
 
+interface IRequestKernel extends IRequestGeneric {
+	Params: {
+		serverNamespace: string, // server:namespace
+		kernelId: string
+	}
+}
+
 // The Server Manager API handle
 let serverManagerApi: any;
 
-let serverSpecMap: Map<string, IServerSpec>;
-
 async function getTarget(serverNamespace: string): Promise<ITarget> {
-	const parts = serverNamespace.split(':');
-	const namespace = parts[1].toUpperCase();
-	if (parts.length === 2) {
-		const serverName = parts[0].toLowerCase();
-		let serverSpec = serverSpecMap.get(serverName);
-		if (serverSpec) {
-			return { server: serverName, namespace, serverSpec };
-		}
-		if (typeof serverManagerApi === 'undefined') {
-			let extension;
-			extension = vscode.extensions.getExtension(serverManager.EXTENSION_ID);
-			if (!extension) {
-			  // Maybe ask user for permission to install Server Manager
-			  await vscode.commands.executeCommand('workbench.extensions.installExtension', serverManager.EXTENSION_ID);
-			  extension = vscode.extensions.getExtension(serverManager.EXTENSION_ID);
-			}
-			if (!extension) {
-				return { server: '', namespace: ''};
-			}
-			if (!extension.isActive) {
-			  await extension.activate();
-			}
-			serverManagerApi = extension.exports;
-		}
-		if (serverManagerApi && serverManagerApi.getServerSpec) {
-			serverSpec = await serverManagerApi.getServerSpec(serverName);
-			if (!serverSpec) {
-				return { server: serverName, namespace };
-			}
-			if (typeof serverSpec.password === 'undefined') {
-			  const scopes = [serverSpec.name, serverSpec.username || ''];
-			  let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
-			  if (!session) {
-				session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
-			  }
-			  if (session) {
-				serverSpec.username = session.scopes[1];
-				serverSpec.password = session.accessToken;
-			  }
-			}
-			serverSpecMap.set(serverName, serverSpec);
-			return { server: serverName, namespace, serverSpec };
-		  }
-		return { server: serverName, namespace };
+	const serverNamespaceMgr = ServerNamespaceMgr.get(serverNamespace);
+	if (serverNamespaceMgr) {
+		return serverNamespaceMgr.target;
 	}
-	return { server: '', namespace: ''};
+
+	const resolveTarget = (async (): Promise<ITarget> => {
+		const parts = serverNamespace.split(':');
+		const namespace = parts[1].toUpperCase();
+		if (parts.length === 2) {
+			const serverName = parts[0].toLowerCase();
+			let serverSpec = Server.get(serverName);
+			if (serverSpec) {
+				return { server: serverName, namespace, serverSpec };
+			}
+			if (typeof serverManagerApi === 'undefined') {
+				let extension;
+				extension = vscode.extensions.getExtension(serverManager.EXTENSION_ID);
+				if (!extension) {
+				// Maybe ask user for permission to install Server Manager
+				await vscode.commands.executeCommand('workbench.extensions.installExtension', serverManager.EXTENSION_ID);
+				extension = vscode.extensions.getExtension(serverManager.EXTENSION_ID);
+				}
+				if (!extension) {
+					return { server: '', namespace: ''};
+				}
+				if (!extension.isActive) {
+				await extension.activate();
+				}
+				serverManagerApi = extension.exports;
+			}
+			if (serverManagerApi && serverManagerApi.getServerSpec) {
+				serverSpec = await serverManagerApi.getServerSpec(serverName) as serverManager.IServerSpec;
+				if (!serverSpec) {
+					return { server: serverName, namespace };
+				}
+				if (typeof serverSpec.password === 'undefined') {
+				const scopes = [serverSpec.name, serverSpec.username || ''];
+				let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
+				if (!session) {
+					session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
+				}
+				if (session) {
+					serverSpec.username = session.scopes[1];
+					serverSpec.password = session.accessToken;
+				}
+				}
+				const server = new Server(serverSpec);
+				Server.set(serverName, serverSpec);
+				return { server: serverName, namespace, serverSpec };
+			}
+			return { server: serverName, namespace };
+		}
+		return { server: '', namespace: ''};
+	});
+	const target = await resolveTarget();
+	if (target.serverSpec) {
+		if (!Server.get(serverNamespace)) {
+			new Server(target.serverSpec);
+		}
+		new ServerNamespaceMgr(serverNamespace, target);
+	}
+	return target;
 }
 
 export async function addRoutes(fastify:FastifyInstance) {
-
-	serverSpecMap = new Map<string, IServerSpec>;
 
 	fastify.get('/:serverNamespace/hub/api', async (request: FastifyRequest<IRequestGeneric>, reply) => {
 		const { serverNamespace } = request.params;
@@ -133,12 +143,35 @@ export async function addRoutes(fastify:FastifyInstance) {
 
 
 	fastify.get('/:serverNamespace/api/kernelspecs', async (request: FastifyRequest<IRequestGeneric>, reply) => {
-		const target = await getTarget(request.params.serverNamespace);
+		const serverNamespace = request.params.serverNamespace;
+		const noKernels = (message: string): any => {
+			return {
+				"default": "none",
+				"kernelspecs": {
+					"none": {
+						"name": "none",
+						"resources": {},
+						"spec": {
+							"language": "plaintext",
+							"display_name": `ERROR @ ${serverNamespace}`,
+							"argv": [`${message}`]
+						}
+					}
+				},
+			};
+		};
+		const target = await getTarget(serverNamespace);
 		if (!target?.serverSpec) {
-			reply.code(400);
-			return {};
+			return noKernels(`Unknown target '${request.params.serverNamespace}'`);
 		}
-		const irisConn = new IRISConnection(target);
+		let irisConn: IRISConnection;
+		let serverVersion: string;
+		try {
+			irisConn = new IRISConnection(target);
+			serverVersion = irisConn.iris.getServerVersion();
+		} catch (error) {
+			return noKernels(error as string);
+		}
 
 		const { server, namespace } = target;
 		return {
@@ -185,9 +218,36 @@ export async function addRoutes(fastify:FastifyInstance) {
 	});
 
 	fastify.get('/:serverNamespace/api/kernels', async (request: FastifyRequest<IRequestGeneric>, reply) => {
+		const serverNamespace = request.params.serverNamespace;
+		await getTarget(serverNamespace);
+		return ServerNamespaceMgr.get(serverNamespace)?.allKernels() || [];
+	});
+
+	fastify.post('/:serverNamespace/api/kernels', async (request: FastifyRequest<IRequestGeneric>, reply) => {
 		// TODO
-		//const { server, namespace } = await getTarget(request.params.serverNamespace);
-		return [];
+		const { server, namespace } = await getTarget(request.params.serverNamespace);
+
+		var payload: JupyterServerAPI.IKernel;
+		try {
+			payload = JSON.parse(request.body);
+		}
+		catch (error) {
+			reply.code(400);
+			return {};
+		}
+
+		const { name } = payload;
+		reply.code(501);
+		return {
+			"message": `TODO - In '${namespace}' on '${server}' start a '${name}' kernel`,
+			"short_message": "TODO"
+		};
+	});
+
+	fastify.get('/:serverNamespace/api/kernels/:kernelId', async (request: FastifyRequest<IRequestKernel>, reply) => {
+		const serverNamespace = request.params.serverNamespace;
+		const kernelId = request.params.kernelId;
+		return ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
 	});
 
 	fastify.get('/:serverNamespace/api/sessions', async (request: FastifyRequest<IRequestGeneric>, reply) => {
@@ -199,42 +259,61 @@ export async function addRoutes(fastify:FastifyInstance) {
 
 	fastify.register(async (fastify, opts) => {
 
-		interface IKernel {
-			name: string
-		}
-
-		interface ISessionsRequest {
-			kernel: IKernel,
-			name: string,
-			type: string
-		}
-
 		fastify.post('/:serverNamespace/api/sessions', async (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const { serverNamespace } = request.params;
-			const target = await getTarget(serverNamespace);
-			const { server, namespace, serverSpec } = target;
-			if (!server) {
+			const serverNamespaceMgr = ServerNamespaceMgr.get(serverNamespace);
+			if (!serverNamespaceMgr?.target.serverSpec) {
 				reply.code(400);
 				return {};
 			}
-			var payload: ISessionsRequest;
+			const target = serverNamespaceMgr.target;
+			var session: JupyterServerAPI.ISession;
 			try {
-				payload = JSON.parse(request.body);
+				session = JSON.parse(request.body);
 			}
 			catch (error) {
 				reply.code(400);
 				return {};
 			}
-			const { kernel, name, type} = payload;
+			const { name, type, path, kernel } = session;
+
+			const existingSession = serverNamespaceMgr?.getSession(name);
+			if (existingSession) {
+				reply.code(201);
+				return existingSession;
+			}
+
+			const { server, namespace, serverSpec } = target;
+			if (kernel.name === 'none') {
+				const message = serverSpec
+					? `Namespace '${namespace}' on server '${server}' cannot run kernels. Check hover tip on kernel selector for more information.`
+					: `Server '${server}' not defined.`;
+				reply.code(500);
+				return {
+					message,
+					"short_message": "NOKERNELS"
+				};
+			}
+
+			reply.code(201);
+			return serverNamespaceMgr.createSession(session);
+
+			/*
 
 			const irisConn = new IRISConnection(target);
 			const serverVersion = irisConn.iris.getServerVersion();
+			console.log(`TODO: POST@api/sessions - In '${namespace}' on '${server}' (${serverVersion}) create '${type}' session '${name}' for path '${path}' using kernel '${kernel.name}'`);
+
+			const result = JSON.parse(irisConn.iris.classMethodValue('PolyglotKernel.CodeExecutor', 'CodeResult', 'write $zversion', 'cos'));
 
 			reply.code(501);
 			return {
-				"message": `TODO - In '${namespace}' on '${server}' (${serverVersion}) create '${type}' session '${name}' using kernel '${kernel.name}'`,
+				"message": `TODO - In '${namespace}' on '${server}' (${serverVersion}) create '${type}' session '${name}' for path '${path}' using kernel '${kernel.name}'`
+					+ `\nCodeResult status: ${result.status}\n${result.out}`
+					,
 				"short_message": "TODO"
 			};
+			*/
 		});
 	});
 }

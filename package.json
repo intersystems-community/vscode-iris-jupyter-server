@@ -43,6 +43,14 @@
         "command": "iris-jupyter-server.helloWorld",
         "title": "Hello World"
       }
+    ],
+    "languages": [
+      {
+        "id": "iris-polyglot",
+        "aliases": [
+          "Polyglot IRIS notebook"
+        ]
+      }
     ]
   },
   "scripts": {
@@ -57,13 +65,15 @@
     "test": "node ./out/test/runTest.js"
   },
   "dependencies": {
-    "fastify": "^4.9.2"
+    "fastify": "^4.9.2",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@types/vscode": "^1.72.0",
     "@types/glob": "^8.0.0",
     "@types/mocha": "^10.0.0",
     "@types/node": "16.x",
+    "@types/uuid": "^8.3.4",
     "@typescript-eslint/eslint-plugin": "^5.38.1",
     "@typescript-eslint/parser": "^5.38.1",
     "eslint": "^8.24.0",

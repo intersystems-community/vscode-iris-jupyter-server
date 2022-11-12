@@ -16,7 +16,8 @@ export class IRISConnection extends Disposable{
 			ns: target.namespace,
 			user: target.serverSpec?.username,
 			pwd: target.serverSpec?.password,
-			sharedmemory: false
+			sharedmemory: false,
+			timeout: 2000
 		};
 
 		this.connection = irisNative.createConnection(connectionInfo);
