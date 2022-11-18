@@ -27,7 +27,7 @@ export class IRISConnection extends Disposable{
 		}
 
 		if (this.iris) {
-			console.log(`IRISConnection created: ${this.iris.getServerVersion()}`);
+			 console.log(`IRISConnection created: ${this.iris.getServerVersion()}`);
 		}
 	}
 }

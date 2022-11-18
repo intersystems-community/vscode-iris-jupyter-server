@@ -5,9 +5,11 @@ export namespace JupyterServerAPI {
 	export interface IKernel {
 		name: string,
 		id?: string,
-		lastActivity?: string,
+		last_activity?: string,
 		connections?: number,
-		executionState?: string
+		execution_state?: string,
+
+		//info: any
 	}
 
 	export interface ISession {

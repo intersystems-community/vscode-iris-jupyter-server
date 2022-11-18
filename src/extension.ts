@@ -3,7 +3,11 @@
 import * as vscode from 'vscode';
 
 import Fastify from 'fastify';
-import * as api from './api';
+import * as FastifyWS from '@fastify/websocket';
+import { KernelsApi } from './api/kernels';
+import { MiscApi } from './api';
+import { SessionsApi } from './api/sessions';
+import { ContentsApi } from './api/contents';
 
 
 // This method is called when your extension is activated
@@ -26,15 +30,26 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(disposable);
 
 	const fastify = Fastify({
-		logger: true
+		//logger: true
 	});
 
+	// Websockets plugin
+	fastify.register(FastifyWS.default);
+
+/*
 	// Define a simple endpoint
 	fastify.get('/', async (request, reply) => {
 		return { hello: 'world' };
 	});
+*/
 
-	api.addRoutes(fastify);
+	// Routes
+	fastify.register(async (fastify) => {
+		KernelsApi.addRoutes(fastify);
+		SessionsApi.addRoutes(fastify);
+		ContentsApi.addRoutes(fastify);
+		MiscApi.addRoutes(fastify);
+	});
 
 	// Run the server, listening only on loopback interface
 	const start = async () => {
