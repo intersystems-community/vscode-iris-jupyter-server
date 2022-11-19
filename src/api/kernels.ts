@@ -42,7 +42,7 @@ export class KernelsApi extends ApiBase {
 			const serverNamespace = request.params.serverNamespace;
 			await this.getTarget(serverNamespace);
 			const result = ServerNamespaceMgr.get(serverNamespace)?.allKernels() || [];
-			console.log(`/:serverNamespace/api/kernels result: ${JSON.stringify(result)}`);
+			//console.log(`/:serverNamespace/api/kernels result: ${JSON.stringify(result)}`);
 			return result;
 		});
 
@@ -97,31 +97,51 @@ export class KernelsApi extends ApiBase {
 
 				connection.socket.on('message', (rawData) => {
 					console.log(`WS message arrived: ${rawData.toString('utf8')}`);
+					let message: nteract.JupyterMessage = JSON.parse(rawData.toString('utf8'));
+
 					const sendStatus = (status: string) => {
-						const msg = nteract.createMessage('status', { content: { 'execution_state': status } });
-						msg.channel = 'iopub';
+						const msg = nteract.createMessage('status', { parent_header: message.header, content: { 'execution_state': status } });
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
-						connection.socket.send(JSON.stringify(msg), () => {
+						connection.socket.send(JSON.stringify(msg), { fin: true }, () => {
 							console.log(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}, status ${status}: ${JSON.stringify(msg)}`);
 						});
 					};
 
+					const sendResult = (output: string) => {
+						const msg = nteract.createMessage('execute_result', {
+							parent_header: message.header,
+							content: {
+								execution_count: 0, //TODO
+								data: {
+									'text/plain': output
+								}
+							}
+						});
+						msg.header.session = kernelSessionId;
+						msg.header.username = 'iris-jupyter-server';
+						connection.socket.send(JSON.stringify(msg), { fin: true }, () => {
+							console.log(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
+						});
+					};
+
+					/*
 					const broadcast = (msg: nteract.JupyterMessage) => {
 						const originalChannel = msg.channel;
 						msg.channel = 'iopub';
 						const outString = JSON.stringify(msg);
-						connection.socket.send(outString, () => {
+						connection.socket.send(outString, { fin: true }, () => {
 							console.log(` > kernel '${kernelId}' socket message was broadcast on IOPub: ${outString}`);
 						});
 						msg.channel = originalChannel;
 					};
+					*/
 
-					let message: nteract.JupyterMessage = JSON.parse(rawData.toString('utf8'));
 					console.log(` < kernel '${kernelId}' socket message received, channel ${message.channel}, type ${message.header.msg_type} message=${JSON.stringify(message)}`);
 
 					sendStatus('busy');
-					broadcast(message);
+
+					//broadcast(message);
 
 					let reply: any;
 					if (message.channel === 'shell') {
@@ -142,10 +162,10 @@ export class KernelsApi extends ApiBase {
 										help_links: []
 									}
 								});
-
 								break;
 
 							case 'execute_request':
+								sendResult((message.content.code as string).toUpperCase());
 								reply = nteract.createMessage('execute_reply', {
 									parent_header: message.header,
 									content: {
@@ -172,7 +192,7 @@ export class KernelsApi extends ApiBase {
 					if (reply) {
 						reply.header.session = kernelSessionId;
 						reply.header.username = 'iris-jupyter-server';
-						connection.socket.send(JSON.stringify(reply), () => {
+						connection.socket.send(JSON.stringify(reply), { fin: true }, () => {
 							console.log(` > Sent reply: ${JSON.stringify(reply)}`);
 							sendStatus('idle');
 						});

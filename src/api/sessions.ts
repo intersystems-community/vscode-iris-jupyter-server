@@ -18,7 +18,7 @@ export class SessionsApi extends ApiBase {
 		fastify.get('/:serverNamespace/api/sessions', (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
 			const result = ServerNamespaceMgr.get(serverNamespace)?.allSessions() || [];
-			console.log(`/:serverNamespace/api/sessions result: ${JSON.stringify(result)}`);
+			//console.log(`/:serverNamespace/api/sessions result: ${JSON.stringify(result)}`);
 			return result;
 		});
 
