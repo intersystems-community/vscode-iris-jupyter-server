@@ -10,6 +10,7 @@ interface IRequestContents extends IRequestGeneric {
 
 export class ContentsApi extends ApiBase {
 
+	// NOT YET CALLED from activate()
 	static addRoutes(fastify: FastifyInstance) {
 
 		// See https://petstore.swagger.io/?url=https://raw.githubusercontent.com/jupyter/jupyter_server/master/jupyter_server/services/api/api.yaml#/contents

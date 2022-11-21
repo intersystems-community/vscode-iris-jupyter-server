@@ -192,7 +192,8 @@ export class MiscApi extends ApiBase {
 						"spec": {
 							"language": "iris-polyglot",
 							"display_name": `Polyglot IRIS`,
-							"argv": [`${server}:${namespace}`]
+							"argv": [`${server}:${namespace}`],
+							"interrupt_mode": "message"
 						}
 					},
 					"iris-objectscript": {
@@ -201,7 +202,8 @@ export class MiscApi extends ApiBase {
 						"spec": {
 							"language": "objectscript-int",
 							"display_name": "IRIS ObjectScript INT",
-							"argv": [`${server}:${namespace}`]
+							"argv": [`${server}:${namespace}`],
+							"interrupt_mode": "message"
 						}
 					},
 					"iris-python": {
@@ -210,7 +212,8 @@ export class MiscApi extends ApiBase {
 						"spec": {
 							"language": "python",
 							"display_name": "IRIS Python",
-							"argv": [`${server}:${namespace}`]
+							"argv": [`${server}:${namespace}`],
+							"interrupt_mode": "message"
 						}
 					},
 					"iris-sql": {
@@ -219,7 +222,8 @@ export class MiscApi extends ApiBase {
 						"spec": {
 							"language": "sql",
 							"display_name": "IRIS SQL",
-							"argv": [`${server}:${namespace}`]
+							"argv": [`${server}:${namespace}`],
+							"interrupt_mode": "message"
 						}
 					}
 				},

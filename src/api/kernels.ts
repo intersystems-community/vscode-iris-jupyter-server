@@ -4,7 +4,6 @@ import * as nteract from "@nteract/messaging";
 import { ApiBase, IRequestGeneric, IRouteGeneric } from "../api";
 import { JupyterServerAPI } from "../jupyterServerAPI";
 import { ServerNamespaceMgr } from "../serverNamespaceMgr";
-import { v4 as uuid } from 'uuid';
 import console = require("console");
 
 
@@ -38,9 +37,8 @@ export class KernelsApi extends ApiBase {
 
 	static addRoutes(fastify: FastifyInstance) {
 
-		fastify.get('/:serverNamespace/api/kernels', async (request: FastifyRequest<IRequestGeneric>, reply) => {
+		fastify.get('/:serverNamespace/api/kernels', (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
-			await this.getTarget(serverNamespace);
 			const result = ServerNamespaceMgr.get(serverNamespace)?.allKernels() || [];
 			//console.log(`/:serverNamespace/api/kernels result: ${JSON.stringify(result)}`);
 			return result;
@@ -67,22 +65,79 @@ export class KernelsApi extends ApiBase {
 			};
 		});
 
-		// Websocket handler for /api/kernels/:kernelId
-		fastify.get('/:serverNamespace/api/kernels/:kernelId',
-			{ websocket: true },
-			(connection: FastifyWS.SocketStream, request: any) => {
-				const serverNamespace = request.params.serverNamespace;
-				const kernelId = request.params.kernelId;
-				console.log(`TODO - WSget for kernelId '${kernelId}' on '${serverNamespace}'`);
-
-				connection.socket.on('message', (message) => {
-					console.log(`kernel '${kernelId}' socket received message`);
-				});
+		fastify.get('/:serverNamespace/api/kernels/:kernelId', (request: FastifyRequest<IRequestKernel>, reply) => {
+			const serverNamespace = request.params.serverNamespace;
+			const kernelId = request.params.kernelId;
+			const kernel = ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
+			if (!kernel) {
+				reply.code(404);
 				return;
 			}
-		);
+
+			reply.code(200);
+			return kernel;
+		});
+
+		fastify.delete('/:serverNamespace/api/kernels/:kernelId', (request: FastifyRequest<IRequestKernel>, reply) => {
+			// TODO
+			const serverNamespace = request.params.serverNamespace;
+			const kernelId = request.params.kernelId;
+			const kernel = ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
+			if (!kernel) {
+				reply.code(404);
+				return;
+			}
+
+			//TODO Delete
+			reply.code(404);
+			return;
+
+			reply.code(204);
+			return kernel;
+		});
+
+		fastify.post('/:serverNamespace/api/kernels/:kernelId/interrupt', (request: FastifyRequest<IRequestKernel>, reply) => {
+			//TODO
+			const serverNamespace = request.params.serverNamespace;
+			const kernelId = request.params.kernelId;
+			console.log(`TODO - interrupt for kernelId '${kernelId}' on '${serverNamespace}'`);
+
+			const kernel = ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
+			if (!kernel) {
+				reply.code(404);
+				return;
+			}
+
+			//TODO Interrupt
+			reply.code(404);
+			return;
+
+			reply.code(204);
+			return;
+		});
+
+		fastify.post('/:serverNamespace/api/kernels/:kernelId/restart', (request: FastifyRequest<IRequestKernel>, reply) => {
+			//TODO
+			const serverNamespace = request.params.serverNamespace;
+			const kernelId = request.params.kernelId;
+			console.log(`TODO - restart for kernelId '${kernelId}' on '${serverNamespace}'`);
+
+			const kernel = ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
+			if (!kernel) {
+				reply.code(404);
+				return;
+			}
+
+			// TODO Restart
+			//reply.code(404);
+			//return;
+
+			reply.code(200);
+			return ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
+		});
 
 		// Websocket handler for /api/kernels/:kernelId/channels
+		// Provides https://jupyter-client.readthedocs.io/en/stable/messaging.html as JSON over a websocket
 		fastify.get('/:serverNamespace/api/kernels/:kernelId/channels',
 			{ websocket: true },
 			(connection: FastifyWS.SocketStream, request: FastifyRequest<IRequestChannels>) => {
@@ -103,7 +158,7 @@ export class KernelsApi extends ApiBase {
 						const msg = nteract.createMessage('status', { parent_header: message.header, content: { 'execution_state': status } });
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
-						connection.socket.send(JSON.stringify(msg), { fin: true }, () => {
+						connection.socket.send(JSON.stringify(msg), () => {
 							console.log(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}, status ${status}: ${JSON.stringify(msg)}`);
 						});
 					};
@@ -115,12 +170,30 @@ export class KernelsApi extends ApiBase {
 								execution_count: 0, //TODO
 								data: {
 									'text/plain': output
-								}
+								},
+								metadata: {}
 							}
 						});
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
-						connection.socket.send(JSON.stringify(msg), { fin: true }, () => {
+						connection.socket.send(JSON.stringify(msg), () => {
+							console.log(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
+						});
+					};
+
+					const sendError = () => {
+						const msg = nteract.createMessage('error', {
+							parent_header: message.header,
+							content: {
+								ename: 'errName (does this appear?)',
+								evalue: 'error message (does this appear?)',
+								// Can use colours in the traceback lines; see https://en.wikipedia.org/wiki/ANSI_escape_code#Colors for numbers
+								traceback: ['\u001b[1;31mTraceback1\u001b[1;39m in red', '\u001b[1;32mTraceback2\u001b[1;39m in green']
+							}
+						});
+						msg.header.session = kernelSessionId;
+						msg.header.username = 'iris-jupyter-server';
+						connection.socket.send(JSON.stringify(msg), () => {
 							console.log(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
 						});
 					};
@@ -130,7 +203,7 @@ export class KernelsApi extends ApiBase {
 						const originalChannel = msg.channel;
 						msg.channel = 'iopub';
 						const outString = JSON.stringify(msg);
-						connection.socket.send(outString, { fin: true }, () => {
+						connection.socket.send(outString, () => {
 							console.log(` > kernel '${kernelId}' socket message was broadcast on IOPub: ${outString}`);
 						});
 						msg.channel = originalChannel;
@@ -165,6 +238,18 @@ export class KernelsApi extends ApiBase {
 								break;
 
 							case 'execute_request':
+								if ((message.content.code as string).startsWith('ERR')) {
+									sendError();
+									reply = nteract.createMessage('execute_reply', {
+										parent_header: message.header,
+										content: {
+											'status': 'error',
+											'execution_count': 0 //TODO
+										}
+									});
+									break;
+								}
+
 								sendResult((message.content.code as string).toUpperCase());
 								reply = nteract.createMessage('execute_reply', {
 									parent_header: message.header,
@@ -173,6 +258,23 @@ export class KernelsApi extends ApiBase {
 										'execution_count': 0 //TODO
 									}
 								});
+								break;
+
+							case 'complete_request':
+								//TODO if we can and want to
+								break;
+
+							default:
+								break;
+						}
+					}
+					else if (message.channel === 'control') {
+						// TODO does the Jupyter extension actually use the control channel yet?
+						switch (message.header.msg_type) {
+							case 'shutdown_request':
+								break;
+
+							case 'interrupt_request':
 								break;
 
 							default:
@@ -188,11 +290,20 @@ export class KernelsApi extends ApiBase {
 								break;
 						}
 					}
+					else if (message.channel === 'stdin') {
+						switch (message.header.msg_type) {
+							case 'input_reply':
+								break;
+
+							default:
+								break;
+						}
+					}
 
 					if (reply) {
 						reply.header.session = kernelSessionId;
 						reply.header.username = 'iris-jupyter-server';
-						connection.socket.send(JSON.stringify(reply), { fin: true }, () => {
+						connection.socket.send(JSON.stringify(reply), () => {
 							console.log(` > Sent reply: ${JSON.stringify(reply)}`);
 							sendStatus('idle');
 						});

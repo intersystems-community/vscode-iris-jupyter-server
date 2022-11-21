@@ -43,24 +43,10 @@ export class ServerNamespaceMgr extends Disposable {
 
 	createSession(session: JupyterServerAPI.ISession): JupyterServerAPI.ISession {
 		console.log(`TODO@ServerNamespaceMgr: create '${session.type}' type session with name '${session.name}' for path '${session.path}' with a '${session.kernel.name}' kernel`);
-		//session.id = uuid();
-		session.id = session.name;
-		session.kernel.id = session.id;
+		session.id = uuid();
+		session.kernel.id = uuid();
 		session.kernel.connections = 0;
 		session.kernel.execution_state = 'idle';
-
-		/*
-		session.kernel.info = {
-			'status': 'ok',
-			'implementation': 'iris-jupyter-server',
-			'implementation_version': '0.0.1',
-			'language_info': {
-				'name': 'iris-polyglot',
-				'version': '0.0.1'
-			},
-			'banner': '(a fake kernel banner)'
-		};
-		*/
 
 		this._sessionMap.set(session.name, session);
 		this._kernelMap.set(session.kernel.id, session.kernel);
