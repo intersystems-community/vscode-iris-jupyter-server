@@ -6,18 +6,22 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 {
 #Define vstrCommand zzPKCE1
 #Define type zzPKCE2
+#Define codeArray zzPKCE3
+#Define qCodeArray ##Quote(zzPKCE3)
+#Define err zzPKCE4
 #Define NewList ##Quote(New $$$vstrCommand,$$$type)
 
-#Define tOldIORedirected $$$vstrCommand(1)
-#Define tOldMnemonic $$$vstrCommand(2)
-#Define tOldIO $$$vstrCommand(3)
-#Define status $$$vstrCommand(4)
-#Define stdiomode $$$vstrCommand(5)
-#Define ex $$$vstrCommand(6)
-#Define tStatement $$$vstrCommand(7)
-#Define qStatus $$$vstrCommand(8)
-#Define rset $$$vstrCommand(9)
-#Define sc $$$vstrCommand(10)
+#Define tOldIORedirected $$$type(1)
+#Define tOldMnemonic $$$type(2)
+#Define tOldIO $$$type(3)
+#Define status $$$type(4)
+#Define stdiomode $$$type(5)
+#Define ex $$$type(6)
+#Define tStatement $$$type(7)
+#Define qStatus $$$type(8)
+#Define rset $$$type(9)
+#Define sc $$$type(10)
+#Define tempDatabase $$$type(10)
 
 #Define str ^||zzPKCE
 
@@ -36,7 +40,12 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 
 		if $$$type = "cos" {
 			Try {
-				XECUTE ($$$NewList_" "_$$$vstrCommand)
+				set $$$codeArray = $$$qCodeArray
+				for $$$codeArray(0) = 1:1:$length($$$vstrCommand, $c(10)) set $$$codeArray($$$codeArray(0)) = $piece($$$vstrCommand, $c(10), $$$codeArray(0))
+				if $compile(@$$$codeArray, 0, $$$err) for $$$codeArray(0) = 1:1:$$$codeArray(0) set $$$codeArray($$$codeArray(0)) = " "_$$$codeArray($$$codeArray(0))
+				set $$$tempDatabase = "^"_##class(%SYS.Namespace).GetGlobalDest(,"^CacheTemp")
+				XECUTE "new $namespace set $namespace = """_$$$tempDatabase_""" zr  xecute ""f "_$$$codeArray_"(0) = 1:1:"_$$$codeArray_"(0) zi "_$$$codeArray_"("_$$$codeArray_"(0))"" zs @(""temp""_$j)"
+				XECUTE $$$NewList_" d @(""^|"""""_$$$tempDatabase_"""""|temp"_$j_""")"
 			}
 			Catch $$$ex {
 				d output($$$ex.DisplayString(), "")
