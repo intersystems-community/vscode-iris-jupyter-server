@@ -20,19 +20,6 @@ interface IRequestChannels extends IRequestKernel {
 	}
 }
 
-interface IRouteKernel extends IRouteGeneric {
-	Params: {
-		serverNamespace: string, // server:namespace
-		kernelId: string
-	}
-}
-
-interface IRouteChannels extends IRouteKernel {
-	Querystring: {
-		session_id: string;
-	}
-}
-
 export class KernelsApi extends ApiBase {
 
 	static addRoutes(fastify: FastifyInstance) {
@@ -40,7 +27,7 @@ export class KernelsApi extends ApiBase {
 		fastify.get('/:serverNamespace/api/kernels', (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
 			const result = ServerNamespaceMgr.get(serverNamespace)?.allKernels() || [];
-			//console.log(`/:serverNamespace/api/kernels result: ${JSON.stringify(result)}`);
+			console.log(`/:serverNamespace/api/kernels GET - result: ${JSON.stringify(result)}`);
 			return result;
 		});
 
@@ -109,8 +96,6 @@ export class KernelsApi extends ApiBase {
 			}
 
 			//TODO Interrupt
-			reply.code(404);
-			return;
 
 			reply.code(204);
 			return;
@@ -129,8 +114,6 @@ export class KernelsApi extends ApiBase {
 			}
 
 			// TODO Restart
-			//reply.code(404);
-			//return;
 
 			reply.code(200);
 			return ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
@@ -181,14 +164,14 @@ export class KernelsApi extends ApiBase {
 						});
 					};
 
-					const sendError = () => {
+					const sendError = (text: string) => {
 						const msg = nteract.createMessage('error', {
 							parent_header: message.header,
 							content: {
 								ename: 'errName (does this appear?)',
 								evalue: 'error message (does this appear?)',
 								// Can use colours in the traceback lines; see https://en.wikipedia.org/wiki/ANSI_escape_code#Colors for numbers
-								traceback: ['\u001b[1;31mTraceback1\u001b[1;39m in red', '\u001b[1;32mTraceback2\u001b[1;39m in green']
+								traceback: [`\u001b[1;31m${text}\u001b[1;39m`]
 							}
 						});
 						msg.header.session = kernelSessionId;
@@ -238,8 +221,11 @@ export class KernelsApi extends ApiBase {
 								break;
 
 							case 'execute_request':
-								if ((message.content.code as string).startsWith('ERR')) {
-									sendError();
+
+								const process = ServerNamespaceMgr.get(serverNamespace)?.getProcess(kernelId);
+								const irisConn = process?.connection;
+								if (!irisConn) {
+									sendError('No connection');
 									reply = nteract.createMessage('execute_reply', {
 										parent_header: message.header,
 										content: {
@@ -250,7 +236,65 @@ export class KernelsApi extends ApiBase {
 									break;
 								}
 
-								sendResult((message.content.code as string).toUpperCase());
+								// const result = { out: (message.content.code as string).toUpperCase(), status: 1 };
+								let language = 'cos';
+								let code: string = message.content.code;
+								switch (process.name) {
+									case 'iris-python':
+										language = 'python';
+										break;
+
+									case 'iris-sql':
+										language = 'sql';
+										break;
+
+									case 'iris-objectscript':
+										language = 'cos';
+										break;
+
+									case 'iris-polyglot':
+										const codeLines = code.split('\n');
+										const magic = codeLines.shift()?.trim().toLowerCase();
+										switch (magic) {
+											case '%%python':
+												language = 'python';
+												code = codeLines.join('\n');
+												break;
+
+											case '%%sql':
+												language = 'sql';
+												code = codeLines.join('\n');
+												break;
+
+											case '%%objectscript':
+												language = 'cos';
+												code = codeLines.join('\n');
+												break;
+
+											default:
+												language = 'cos';
+												break;
+										}
+										break;
+
+									default:
+										break;
+								}
+								const result = JSON.parse(irisConn.iris.classMethodValue('PolyglotKernel.CodeExecutor', 'CodeResult', code, language));
+
+								if (!result.status) {
+									sendError(result.out);
+									reply = nteract.createMessage('execute_reply', {
+										parent_header: message.header,
+										content: {
+											'status': 'error',
+											'execution_count': 0 //TODO
+										}
+									});
+									break;
+								}
+
+								sendResult(result.out);
 								reply = nteract.createMessage('execute_reply', {
 									parent_header: message.header,
 									content: {

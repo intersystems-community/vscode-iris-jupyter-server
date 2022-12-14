@@ -58,23 +58,19 @@ export class SessionsApi extends ApiBase {
 				};
 			}
 
+			let irisConn: IRISConnection;
+			try {
+				irisConn = new IRISConnection(target);
+			} catch (error) {
+				reply.code(500);
+				return {
+					message: `Failed to start kernel process on ${serverNamespace} - ${(error as Error).message}`,
+					"short_message": "KERNELSTART"
+				};
+			}
+
 			reply.code(201);
-			return serverNamespaceMgr.createSession(session);
-
-
-			const irisConn = new IRISConnection(target);
-			const serverVersion = irisConn.iris.getServerVersion();
-			console.log(`TODO: POST@api/sessions - In '${namespace}' on '${server}' (${serverVersion}) create '${type}' session '${name}' for path '${path}' using kernel '${kernel.name}'`);
-
-			const result = JSON.parse(irisConn.iris.classMethodValue('PolyglotKernel.CodeExecutor', 'CodeResult', 'write $zversion', 'cos'));
-
-			reply.code(501);
-			return {
-				"message": `TODO - In '${namespace}' on '${server}' (${serverVersion}) create '${type}' session '${name}' for path '${path}' using kernel '${kernel.name}'`
-					+ `\nCodeResult status: ${result.status}\n${result.out}`
-					,
-				"short_message": "TODO"
-			};
+			return serverNamespaceMgr.createSession(session, irisConn);
 		});
 
 		fastify.delete('/:serverNamespace/api/sessions/:sessionId', (request: FastifyRequest<IRequestSession>, reply) => {

@@ -9,5 +9,14 @@
         "dist": true // set this to false to include "dist" folder in search results
     },
     // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
-    "typescript.tsc.autoDetect": "off"
+    "typescript.tsc.autoDetect": "off",
+	"objectscript.export": {
+		"folder": "server/src",
+		"mapped": false
+	},
+    "objectscript.conn": {
+        "server": "iris221",
+        "ns": "USER",
+        "active": true
+    },
 }

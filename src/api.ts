@@ -10,12 +10,17 @@ import { IRISConnection } from './iris';
 import * as serverManager from '@intersystems-community/intersystems-servermanager';
 import { IServerSpec, Server } from './server';
 import { ServerNamespaceMgr } from './serverNamespaceMgr';
+import { JupyterServerAPI } from './jupyterServerAPI';
 
 // Our interfaces
 export interface ITarget {
 	server: string,
 	namespace: string,
 	serverSpec?: IServerSpec
+}
+
+export interface IProcess extends JupyterServerAPI.IKernel {
+	connection: IRISConnection
 }
 
 export interface IRouteGeneric extends RouteGenericInterface {

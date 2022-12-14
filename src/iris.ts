@@ -27,7 +27,12 @@ export class IRISConnection extends Disposable{
 		}
 
 		if (this.iris) {
-			 console.log(`IRISConnection created: ${this.iris.getServerVersion()}`);
+			try {
+				const initObject = JSON.parse(this.iris.classMethodValue('PolyglotKernel.CodeExecutor', 'Init'));
+				console.log(`IRISConnection Init: ${JSON.stringify(initObject)}`);
+			} catch (error) {
+				console.log(`IRISConnection Init failed: ${error}`);
+			}
 		}
 	}
 }

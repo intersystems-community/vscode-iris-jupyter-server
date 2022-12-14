@@ -1,7 +1,8 @@
 import { Disposable } from "vscode";
-import { ITarget } from "./api";
+import { IProcess, ITarget } from "./api";
 import { JupyterServerAPI } from "./jupyterServerAPI";
 import { v4 as uuid } from 'uuid';
+import { IRISConnection } from "./iris";
 
 var serverNamespaceMgrMap = new Map<string, ServerNamespaceMgr>();
 
@@ -20,17 +21,21 @@ export class ServerNamespaceMgr extends Disposable {
 	}
 
 	private _key: string;
-	private _kernelMap = new Map<string, JupyterServerAPI.IKernel>();
+	private _augmentedKernelMap = new Map<string, IProcess>();
 	private _sessionMap = new Map<string, JupyterServerAPI.ISession>();
 
 	public target: ITarget;
 
 	allKernels(): JupyterServerAPI.IKernel[] {
-		return Array.from(this._kernelMap.values());
+		return Array.from<JupyterServerAPI.IKernel>(this._augmentedKernelMap.values());
 	}
 
 	getKernel(id: string): JupyterServerAPI.IKernel | undefined {
-		return this._kernelMap.get(id);
+		return this._augmentedKernelMap.get(id);
+	}
+
+	getProcess(id: string): IProcess | undefined {
+		return this._augmentedKernelMap.get(id);
 	}
 
 	allSessions(): JupyterServerAPI.ISession[] {
@@ -41,15 +46,16 @@ export class ServerNamespaceMgr extends Disposable {
 		return this._sessionMap.get(name);
 	}
 
-	createSession(session: JupyterServerAPI.ISession): JupyterServerAPI.ISession {
-		console.log(`TODO@ServerNamespaceMgr: create '${session.type}' type session with name '${session.name}' for path '${session.path}' with a '${session.kernel.name}' kernel`);
+	createSession(session: JupyterServerAPI.ISession, connection:IRISConnection): JupyterServerAPI.ISession {
+		console.log(`ServerNamespaceMgr: create '${session.type}' type session with name '${session.name}' for path '${session.path}' with a '${session.kernel.name}' kernel`);
+
 		session.id = uuid();
 		session.kernel.id = uuid();
-		session.kernel.connections = 0;
+		session.kernel.connections = 1;
 		session.kernel.execution_state = 'idle';
 
 		this._sessionMap.set(session.name, session);
-		this._kernelMap.set(session.kernel.id, session.kernel);
+		this._augmentedKernelMap.set(session.kernel.id, { ...session.kernel, connection });
 		return session;
 	}
 
