@@ -55,13 +55,42 @@ export class ServerNamespaceMgr extends Disposable {
 		session.kernel.execution_state = 'idle';
 
 		this._sessionMap.set(session.name, session);
-		this._augmentedKernelMap.set(session.kernel.id, { ...session.kernel, connection });
+		this._augmentedKernelMap.set(session.kernel.id, { ...session.kernel, connection, sessionName: session.name });
 		return session;
+	}
+
+	restartKernel(kernelId: string): string {
+		console.log(`ServerNamespaceMgr: restart kernel ${kernelId}`);
+
+		const process = this._augmentedKernelMap.get(kernelId);
+		if (!process) {
+			return '';
+		}
+
+		process.connection.dispose();
+		process.connection = new IRISConnection(this.target);
+
+		const sessionName = process.sessionName;
+		if (!sessionName) {
+			return '';
+		}
+
+		const session = this._sessionMap.get(sessionName);
+		if (!session) {
+			return '';
+		}
+		session.kernel.connections = 1;
+		session.kernel.execution_state = 'idle';
+
+		return kernelId;
 	}
 
 	constructor(serverNamespace: string, target: ITarget) {
 		super(() => {
 			serverNamespaceMgrMap.delete(this._key);
+			this._augmentedKernelMap.forEach((process) => {
+				process.connection.dispose();
+			});
 		});
 		this._key = serverNamespace;
 		this.target = target;

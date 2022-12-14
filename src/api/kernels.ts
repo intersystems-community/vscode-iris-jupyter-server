@@ -115,8 +115,14 @@ export class KernelsApi extends ApiBase {
 
 			// TODO Restart
 
+			const newKernelId = ServerNamespaceMgr.get(serverNamespace)?.restartKernel(kernelId);
+			if (!newKernelId) {
+				reply.code(404);
+				return;
+			}
+
 			reply.code(200);
-			return ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
+			return ServerNamespaceMgr.get(serverNamespace)?.getKernel(newKernelId);
 		});
 
 		// Websocket handler for /api/kernels/:kernelId/channels
@@ -313,7 +319,7 @@ export class KernelsApi extends ApiBase {
 						}
 					}
 					else if (message.channel === 'control') {
-						// TODO does the Jupyter extension actually use the control channel yet?
+						// The Jupyter extension doesn't seem to use the control channel yet (December 2022)
 						switch (message.header.msg_type) {
 							case 'shutdown_request':
 								break;

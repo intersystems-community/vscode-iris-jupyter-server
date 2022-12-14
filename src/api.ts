@@ -20,7 +20,8 @@ export interface ITarget {
 }
 
 export interface IProcess extends JupyterServerAPI.IKernel {
-	connection: IRISConnection
+	connection: IRISConnection,
+	sessionName: string
 }
 
 export interface IRouteGeneric extends RouteGenericInterface {
@@ -183,6 +184,7 @@ export class MiscApi extends ApiBase {
 			try {
 				irisConn = new IRISConnection(target);
 				serverVersion = irisConn.iris.getServerVersion();
+				irisConn.dispose();
 			} catch (error) {
 				return noKernels(error as string);
 			}
