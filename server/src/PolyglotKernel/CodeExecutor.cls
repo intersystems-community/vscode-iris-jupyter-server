@@ -2,14 +2,22 @@
 Class PolyglotKernel.CodeExecutor
 {
 
+ClassMethod Init(clientJSON As %String) As %String
+{
+	// Remove the %-variables which the Native API for Node.js initially creates in its server-side process
+	kill
+
+	// Report versions
+	return {"apiVersion":("1.0"), "serverVersion":($zversion)}.%ToJSON()
+}
+
 ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %String [ ProcedureBlock = 0 ]
 {
 #Define vstrCommand zzPKCE1
 #Define type zzPKCE2
 #Define codeArray zzPKCE3
-#Define qCodeArray ##Quote(zzPKCE3)
 #Define err zzPKCE4
-#Define NewList ##Quote(New $$$vstrCommand,$$$type)
+#Define newCommand ##Quote(new $$$vstrCommand,$$$type)
 
 #Define tOldIORedirected $$$type(1)
 #Define tOldMnemonic $$$type(2)
@@ -36,32 +44,64 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 
 		//Enable redirection
 		do ##class(%Device).ReDirectIO(1)
-		Set $$$stdiomode = ##class(%SYS.Python).SetStdIOMode(3)
+		set $$$stdiomode = ##class(%SYS.Python).SetStdIOMode(3)
 
 		if $$$type = "cos" {
-			Try {
-				set $$$codeArray = $$$qCodeArray
-				for $$$codeArray(0) = 1:1:$length($$$vstrCommand, $c(10)) set $$$codeArray($$$codeArray(0)) = $piece($$$vstrCommand, $c(10), $$$codeArray(0))
+			try {
+				// Prepare code for checking and conversion into a runnable routine
+				set $$$codeArray = $name($$$codeArray)
+				for $$$codeArray(0) = 1:1:$length($$$vstrCommand, $c(10)) {
+					set $$$codeArray($$$codeArray(0)) = $piece($$$vstrCommand, $c(10), $$$codeArray(0))
+
+					// Avoid omitting a completely empty line
+					if $$$codeArray($$$codeArray(0)) = "" set $$$codeArray($$$codeArray(0)) = " "
+				}
+
+				//Pre-flight check of code. If it fails, guess that linestart spaces are missing.
 				if $compile(@$$$codeArray, 0, $$$err) for $$$codeArray(0) = 1:1:$$$codeArray(0) set $$$codeArray($$$codeArray(0)) = " "_$$$codeArray($$$codeArray(0))
+
+				// Create a process-specific temp routine in the temp database
 				set $$$tempDatabase = "^"_##class(%SYS.Namespace).GetGlobalDest(,"^CacheTemp")
-				XECUTE "new $namespace set $namespace = """_$$$tempDatabase_""" zr  xecute ""f "_$$$codeArray_"(0) = 1:1:"_$$$codeArray_"(0) zi "_$$$codeArray_"("_$$$codeArray_"(0))"" zs @(""temp""_$j)"
-				XECUTE $$$NewList_" d @(""^|"""""_$$$tempDatabase_"""""|temp"_$j_""")"
+				xecute "new $namespace set $namespace = """_$$$tempDatabase_""" zremove  xecute ""f "_$$$codeArray_"(0) = 1:1:"_$$$codeArray_"(0) zinsert "_$$$codeArray_"("_$$$codeArray_"(0))"" zsave @(""zzPKCEjob""_$j)"
+
+				// We no longer need these and shouldn't leak them to user code
+				kill $$$codeArray, $$$err
+
+				// Reinstate any context previously stored in our PPG, then run the routine, then save context
+				if $get($$$str("$test"))
+				set $zr = $get($$$str("$zreference"))
+				xecute $$$newCommand_" do @(""^|"""""_$$$tempDatabase_"""""|zzPKCEjob"_$j_""")"
+				set $$$str("$zreference") = $zr
+				set $$$str("$test") = $test
 			}
-			Catch $$$ex {
-				d output($$$ex.DisplayString(), "")
+			catch $$$ex {
+				do output($$$ex.DisplayString(), "")
 				set $$$status = 0
 			}
 		}
 		elseif $$$type = "sql" {
 			set $$$tStatement =  ##class(%SQL.Statement).%New()
-			SET $$$qStatus = $$$tStatement.%Prepare($$$vstrCommand)
-			IF $$$qStatus'=1 {WRITE "%Prepare failed:" DO $System.Status.DisplayError($$$qStatus) SET $$$status = 0 QUIT}
-			SET $$$rset = $$$tStatement.%Execute()
-			DO $$$rset.%Display()
+			set $$$qStatus = $$$tStatement.%Prepare($$$vstrCommand)
+			if $$$qStatus '= 1 {
+				write "%SQL.Statement::%Prepare failed:"
+				do $System.Status.DisplayError($$$qStatus)
+				set $$$status = 0
+			}
+			else {
+				set $$$rset = $$$tStatement.%Execute()
+				if $$$rset.%SQLCODE >= 0 {
+					do $$$rset.%Display()
+				}
+				else {
+					write "%SQL.Statement::%Execute failed with %SQLCODE=",$$$rset.%SQLCODE," and %Message=",$$$rset.%Message,!
+					set $$$status = 0
+				}
+			}
 		}
 		elseif $$$type = "python" {
 			set $$$sc = ##class(%SYS.Python).Run($$$vstrCommand)
 			if $$$sc = -1 {
+				d output("%SYS.Python::Run failed", "")
 				set $$$status = 0
 			}
 		}
@@ -82,13 +122,21 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 		use $$$tOldIO
 	}
 	do ##class(%Device).ReDirectIO($$$tOldIORedirected)
-	Do:$$$stdiomode'="" ##class(%SYS.Python).SetStdIOMode($$$stdiomode)
+	do:$$$stdiomode'="" ##class(%SYS.Python).SetStdIOMode($$$stdiomode)
 
 	new jsonOut,zr
 	set zr = $zr
 	set jsonOut = {"status":($$$status), "out":($$$str)}.%ToJSON()
 	set $zr = zr
 	return jsonOut
+
+#; Subroutine used by IO redirection code to accumulate output into our PPG
+output(s, prefix)
+	new zr
+	set zr = $zr
+    set $$$str = $g(prefix, $g($$$str))_s
+	set $zr = zr
+    quit
 
 #; IO redirection labels
 rchr(c)
@@ -109,12 +157,6 @@ wstr(s)
     quit
 wtab(s)
     do output($char(9))
-    quit
-output(s, prefix)
-	new zr
-	set zr = $zr
-    set $$$str = $g(prefix, $g($$$str)) _ s
-	set $zr = zr
     quit
 }
 
