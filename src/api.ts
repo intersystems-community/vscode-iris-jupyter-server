@@ -21,7 +21,8 @@ export interface ITarget {
 
 export interface IProcess extends JupyterServerAPI.IKernel {
 	connection: IRISConnection,
-	sessionName: string
+	sessionName: string,
+	executionCount: number
 }
 
 export interface IRouteGeneric extends RouteGenericInterface {

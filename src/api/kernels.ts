@@ -152,11 +152,11 @@ export class KernelsApi extends ApiBase {
 						});
 					};
 
-					const sendResult = (output: string) => {
+					const sendResult = (output: string, executionCount: number) => {
 						const msg = nteract.createMessage('execute_result', {
 							parent_header: message.header,
 							content: {
-								execution_count: 0, //TODO
+								execution_count: executionCount,
 								data: {
 									'text/plain': output
 								},
@@ -236,7 +236,7 @@ export class KernelsApi extends ApiBase {
 										parent_header: message.header,
 										content: {
 											'status': 'error',
-											'execution_count': 0 //TODO
+											'execution_count': 0
 										}
 									});
 									break;
@@ -293,18 +293,18 @@ export class KernelsApi extends ApiBase {
 										parent_header: message.header,
 										content: {
 											status: 'error',
-											execution_count: 0 //TODO
+											execution_count: ++process.executionCount
 										}
 									});
 									break;
 								}
 
-								sendResult(result.out);
+								sendResult(result.out, ++process.executionCount);
 								reply = nteract.createMessage('execute_reply', {
 									parent_header: message.header,
 									content: {
 										status: 'ok',
-										execution_count: 0 //TODO
+										execution_count:  process.executionCount
 									}
 								});
 								break;

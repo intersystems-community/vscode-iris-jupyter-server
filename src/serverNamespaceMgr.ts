@@ -55,7 +55,7 @@ export class ServerNamespaceMgr extends Disposable {
 		session.kernel.execution_state = 'idle';
 
 		this._sessionMap.set(session.name, session);
-		this._augmentedKernelMap.set(session.kernel.id, { ...session.kernel, connection, sessionName: session.name });
+		this._augmentedKernelMap.set(session.kernel.id, { ...session.kernel, connection, sessionName: session.name, executionCount: 0 });
 		return session;
 	}
 
@@ -81,6 +81,7 @@ export class ServerNamespaceMgr extends Disposable {
 		}
 		session.kernel.connections = 1;
 		session.kernel.execution_state = 'idle';
+		process.executionCount = 0;
 
 		return kernelId;
 	}
