@@ -37,6 +37,9 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 	set $$$tOldMnemonic = ##class(%Device).GetMnemonicRoutine()
 	set $$$tOldIO = $io
 	try {
+		if ('$SYSTEM.Security.Check("%Development","U")) {
+			throw ##class(%Exception.StatusException).CreateFromStatus($SYSTEM.Status.Error(921, "%Development:Use"))
+		}
 		d output("", "")
 		set $$$status = 1
 		//Redirect IO to the current routine - makes use of the labels defined below
@@ -44,7 +47,6 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 
 		//Enable redirection
 		do ##class(%Device).ReDirectIO(1)
-		set $$$stdiomode = ##class(%SYS.Python).SetStdIOMode(3)
 
 		if $$$type = "cos" {
 			try {
@@ -99,6 +101,7 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 			}
 		}
 		elseif $$$type = "python" {
+			set $$$stdiomode = ##class(%SYS.Python).SetStdIOMode(3)
 			set $$$sc = ##class(%SYS.Python).Run($$$vstrCommand)
 			if $$$sc = -1 {
 				d output("%SYS.Python::Run failed", "")
@@ -122,7 +125,7 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 		use $$$tOldIO
 	}
 	do ##class(%Device).ReDirectIO($$$tOldIORedirected)
-	do:$$$stdiomode'="" ##class(%SYS.Python).SetStdIOMode($$$stdiomode)
+	do:$get($$$stdiomode)'="" ##class(%SYS.Python).SetStdIOMode($$$stdiomode)
 
 	new jsonOut,zr
 	set zr = $zr
