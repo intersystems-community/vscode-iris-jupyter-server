@@ -4,7 +4,7 @@ Class PolyglotKernel.CodeExecutor
 
 ClassMethod Init(clientJSON As %String) As %String
 {
-	// Remove the %-variables which the Native API for Node.js initially creates in its server-side process
+	// Kill the %-variables which the Native API for Node.js initially creates in its server-side process, as they seem to be redundant.
 	kill
 
 	// Report versions
@@ -13,12 +13,21 @@ ClassMethod Init(clientJSON As %String) As %String
 
 ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %String [ ProcedureBlock = 0 ]
 {
+	// This method deliberately doesn't use procedure-block variable scoping.
+	//
+	// Minimize the number of local variables (zzPKCE*) that we trample on in the user's symbol table:
+	// These are NEWed by being formal parameters
 #Define vstrCommand zzPKCE1
 #Define type zzPKCE2
-#Define codeArray zzPKCE3
-#Define err zzPKCE4
+	// Later they will need to be NEWed in the XECUTE string.
 #Define newCommand ##Quote(new $$$vstrCommand,$$$type)
 
+	// These are explicitly NEWed here
+#Define codeArray zzPKCE3
+#Define err zzPKCE4
+	new $$$codeArray,$$$err
+
+	// Subnodes of one of the formal parameter variables are used for other purposes
 #Define tOldIORedirected $$$type(1)
 #Define tOldMnemonic $$$type(2)
 #Define tOldIO $$$type(3)
@@ -31,8 +40,10 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 #Define sc $$$type(10)
 #Define tempDatabase $$$type(10)
 
+	// This Process-Private Global will accumulate the output, and to preserve context such as $test and $zreference
 #Define str ^||zzPKCE
 
+	// Record what will need to be reinstated
 	set $$$tOldIORedirected = ##class(%Device).ReDirectIO()
 	set $$$tOldMnemonic = ##class(%Device).GetMnemonicRoutine()
 	set $$$tOldIO = $io
@@ -40,12 +51,13 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 		if ('$SYSTEM.Security.Check("%Development","U")) {
 			throw ##class(%Exception.StatusException).CreateFromStatus($SYSTEM.Status.Error(921, "%Development:Use"))
 		}
+
+		// Init the PPG
 		d output("", "")
 		set $$$status = 1
+
 		//Redirect IO to the current routine - makes use of the labels defined below
 		use $io::("^"_$ZNAME)
-
-		//Enable redirection
 		do ##class(%Device).ReDirectIO(1)
 
 		if $$$type = "cos" {
@@ -69,7 +81,7 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 				// We no longer need these and shouldn't leak them to user code
 				kill $$$codeArray, $$$err
 
-				// Reinstate any context previously stored in our PPG, then run the routine, then save context
+				// Reinstate any context previously stored in our PPG, run the routine, then save context
 				if $get($$$str("$test"))
 				set $zr = $get($$$str("$zreference"))
 				xecute $$$newCommand_" do @(""^|"""""_$$$tempDatabase_"""""|zzPKCEjob"_$j_""")"
@@ -127,11 +139,8 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 	do ##class(%Device).ReDirectIO($$$tOldIORedirected)
 	do:$get($$$stdiomode)'="" ##class(%SYS.Python).SetStdIOMode($$$stdiomode)
 
-	new jsonOut,zr
-	set zr = $zr
-	set jsonOut = {"status":($$$status), "out":($$$str)}.%ToJSON()
-	set $zr = zr
-	return jsonOut
+	// Return the result as JSON
+	return {"status":($$$status), "out":($$$str)}.%ToJSON()
 
 #; Subroutine used by IO redirection code to accumulate output into our PPG
 output(s, prefix)
@@ -142,9 +151,15 @@ output(s, prefix)
     quit
 
 #; IO redirection labels
-rchr(c)
+rchr(timeout)
+	; TODO if the stdin channel can be made to work and we have a value to quit with.
+	; Until then, report <ZREAD> on a READ * command.
+	ztrap "READ"
     quit
-rstr(sz,to)
+rstr(size,timeout)
+	; TODO if the stdin channel can be made to work and we have a value to quit with.
+	; Until then, report <ZREAD> on a READ command.
+	ztrap "READ"
     quit
 wchr(s)
     do output($char(s))
