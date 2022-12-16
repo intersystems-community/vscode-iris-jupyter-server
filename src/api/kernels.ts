@@ -27,7 +27,7 @@ export class KernelsApi extends ApiBase {
 		fastify.get('/:serverNamespace/api/kernels', (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
 			const result = ServerNamespaceMgr.get(serverNamespace)?.allKernels() || [];
-			console.log(`/:serverNamespace/api/kernels GET - result: ${JSON.stringify(result)}`);
+			//console.log(`/:serverNamespace/api/kernels GET - result: ${JSON.stringify(result)}`);
 			return result;
 		});
 
@@ -242,7 +242,6 @@ export class KernelsApi extends ApiBase {
 									break;
 								}
 
-								// const result = { out: (message.content.code as string).toUpperCase(), status: 1 };
 								let language = 'cos';
 								let code: string = message.content.code;
 								switch (process.name) {
@@ -293,8 +292,8 @@ export class KernelsApi extends ApiBase {
 									reply = nteract.createMessage('execute_reply', {
 										parent_header: message.header,
 										content: {
-											'status': 'error',
-											'execution_count': 0 //TODO
+											status: 'error',
+											execution_count: 0 //TODO
 										}
 									});
 									break;
@@ -304,8 +303,8 @@ export class KernelsApi extends ApiBase {
 								reply = nteract.createMessage('execute_reply', {
 									parent_header: message.header,
 									content: {
-										'status': 'ok',
-										'execution_count': 0 //TODO
+										status: 'ok',
+										execution_count: 0 //TODO
 									}
 								});
 								break;
