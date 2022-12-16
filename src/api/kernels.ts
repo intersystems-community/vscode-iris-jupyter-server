@@ -84,25 +84,29 @@ export class KernelsApi extends ApiBase {
 		});
 
 		fastify.post('/:serverNamespace/api/kernels/:kernelId/interrupt', (request: FastifyRequest<IRequestKernel>, reply) => {
-			//TODO
 			const serverNamespace = request.params.serverNamespace;
 			const kernelId = request.params.kernelId;
 			console.log(`TODO - interrupt for kernelId '${kernelId}' on '${serverNamespace}'`);
 
-			const kernel = ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
-			if (!kernel) {
+			const process = ServerNamespaceMgr.get(serverNamespace)?.getProcess(kernelId);
+			if (!process) {
 				reply.code(404);
 				return;
 			}
 
-			//TODO Interrupt
-
-			reply.code(204);
+			//TODO - Blocked by Node.js Native API not being async
+			const jobNumber = process.connection.iris.classMethodValue('%SYSTEM.SYS', 'ProcessID');
+			const result = process.connection.iris.classMethodValue('%SYSTEM.Process', 'Terminate', jobNumber);
+			if (result === 1) {
+				reply.code(204);
+			}
+			else {
+				reply.code(404);
+			}
 			return;
 		});
 
 		fastify.post('/:serverNamespace/api/kernels/:kernelId/restart', (request: FastifyRequest<IRequestKernel>, reply) => {
-			//TODO
 			const serverNamespace = request.params.serverNamespace;
 			const kernelId = request.params.kernelId;
 			console.log(`TODO - restart for kernelId '${kernelId}' on '${serverNamespace}'`);
@@ -113,14 +117,11 @@ export class KernelsApi extends ApiBase {
 				return;
 			}
 
-			// TODO Restart
-
 			const newKernelId = ServerNamespaceMgr.get(serverNamespace)?.restartKernel(kernelId);
 			if (!newKernelId) {
 				reply.code(404);
 				return;
 			}
-
 			reply.code(200);
 			return ServerNamespaceMgr.get(serverNamespace)?.getKernel(newKernelId);
 		});
@@ -285,6 +286,20 @@ export class KernelsApi extends ApiBase {
 									default:
 										break;
 								}
+
+								// stdin experiment (blocked by Node.js native interface not being async)
+								/*
+								if (message.content.allow_stdin) {
+									const inputMsg = nteract.createMessage('input_request', {content: { prompt: 'Dummy input prompt triggered by stdin experiment', password: false}});
+									inputMsg.header.session = kernelSessionId;
+									inputMsg.header.username = 'iris-jupyter-server';
+									inputMsg.parent_header = message.header;
+									connection.socket.send(JSON.stringify(inputMsg), () => {
+										console.log(` > kernel '${kernelId}' socket message sent, channel ${inputMsg.channel}, type ${inputMsg.header.msg_type}: ${JSON.stringify(inputMsg)}`);
+									});
+								}
+								*/
+
 								const result = JSON.parse(irisConn.iris.classMethodValue('PolyglotKernel.CodeExecutor', 'CodeResult', code, language));
 
 								if (!result.status) {
@@ -318,7 +333,9 @@ export class KernelsApi extends ApiBase {
 						}
 					}
 					else if (message.channel === 'control') {
-						// The Jupyter extension doesn't seem to use the control channel yet (December 2022)
+						// Either the Jupyter extension doesn't use the control channel yet (December 2022),
+						// or we don't get these messages because the nteract messaging package we use implements too early a version of
+						// the Jupyter Messaging API.
 						switch (message.header.msg_type) {
 							case 'shutdown_request':
 								break;
