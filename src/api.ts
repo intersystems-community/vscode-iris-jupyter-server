@@ -161,15 +161,15 @@ export class MiscApi extends ApiBase {
 			const serverNamespace = request.params.serverNamespace;
 			const noKernels = (message: string): any => {
 				return {
-					"default": "none",
-					"kernelspecs": {
+					default: "none",
+					kernelspecs: {
 						"none": {
-							"name": "none",
-							"resources": {},
-							"spec": {
-								"language": "plaintext",
-								"display_name": `ERROR @ ${serverNamespace}`,
-								"argv": [`${message}`]
+							name: "none",
+							resources: {},
+							spec: {
+								language: "plaintext",
+								display_name: `ERROR @ ${serverNamespace}`,
+								argv: [`${message}`]
 							}
 						}
 					},
@@ -189,51 +189,36 @@ export class MiscApi extends ApiBase {
 				return noKernels(error as string);
 			}
 
-			const { server, namespace } = target;
-			return {
-				"default": "iris-polyglot",
-				"kernelspecs": {
-					"iris-polyglot": {
-						"name": "iris-polyglot",
-						"resources": {},
-						"spec": {
-							"language": "iris-polyglot",
-							"display_name": `Polyglot IRIS`,
-							"argv": [`${server}:${namespace}`],
-							"interrupt_mode": "message"
-						}
-					},
-					"iris-objectscript": {
-						"name": "iris-objectscript",
-						"resources": {},
-						"spec": {
-							"language": "objectscript-int",
-							"display_name": "IRIS ObjectScript INT",
-							"argv": [`${server}:${namespace}`],
-							"interrupt_mode": "message"
-						}
-					},
-					"iris-python": {
-						"name": "iris-python",
-						"resources": {},
-						"spec": {
-							"language": "python",
-							"display_name": "IRIS Python",
-							"argv": [`${server}:${namespace}`],
-							"interrupt_mode": "message"
-						}
-					},
-					"iris-sql": {
-						"name": "iris-sql",
-						"resources": {},
-						"spec": {
-							"language": "sql",
-							"display_name": "IRIS SQL",
-							"argv": [`${server}:${namespace}`],
-							"interrupt_mode": "message"
-						}
+			const specs = new Map<string, any>();
+			const addSpec = (name: string, language: string, display_name: string) => {
+				specs.set(name, {
+					name,
+					resources: {},
+					spec: {
+						language,
+						display_name,
+						argv: [`${target.server}:${target.namespace}`],
+						interrupt_mode: "message"
 					}
-				},
+				});
+			};
+
+			let dfltSpec = 'iris-sql';
+			addSpec('iris-sql', 'sql', 'IRIS SQL');
+			if ((await vscode.languages.getLanguages()).includes('objectscript-int')) {
+				addSpec('iris-objectscript', 'objectscript-int', 'IRIS ObjectScript INT');
+				dfltSpec = 'iris-objectscript';
+			}
+			const matchMajorVersion = serverVersion.match(/\) (\d+)/);
+			if (matchMajorVersion && +(matchMajorVersion[1] ?? '0') >= 2022) {
+				addSpec('iris-python', 'python', 'IRIS Python');
+				dfltSpec = 'iris-python';
+			}
+			addSpec('iris-polyglot', 'iris-polyglot', 'Polyglot IRIS');
+
+			return {
+				default: dfltSpec,
+				kernelspecs: Object.fromEntries(specs)
 			};
 		});
 	}
