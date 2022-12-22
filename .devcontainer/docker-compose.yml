@@ -1,0 +1,15 @@
+version: '3.7'
+services:
+  iris:
+    image: containers.intersystems.com/intersystems/iris-community:2022.3.0.555.0
+    build:
+      context: ../irisapp/
+      dockerfile : Dockerfile
+      args:
+        - IRIS_PASSWORD=${IRIS_PASSWORD:-SYS}
+    entrypoint: sleep
+    command: infinity
+    volumes:
+      - ../:/irisdev/app/
+    environment:
+      - ISC_CPF_MERGE_FILE=/irisdev/app/irisapp/merge.cpf

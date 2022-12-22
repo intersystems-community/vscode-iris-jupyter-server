@@ -2,7 +2,7 @@
   "name": "iris-jupyter-server",
   "displayName": "Jupyter server proxy for InterSystems IRIS",
   "description": "PoC of a VS Code extension to provide a local Jupyter server acting as a proxy for InterSystems IRIS servers defined with InterSystems Server Manager",
-  "version": "0.0.1-SNAPSHOT",
+  "version": "0.0.2-SNAPSHOT",
   "preview": true,
   "publisher": "intersystems-community",
   "repository": {
