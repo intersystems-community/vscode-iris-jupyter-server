@@ -2,9 +2,6 @@ ARG IMAGE=containers.intersystems.com/intersystems/iris-community:2022.3.0.555.0
 
 FROM $IMAGE
 
-# For non community version
-# COPY key/iris.key /usr/irissys/mgr/iris.key
-
 USER root
 
 # Update package and install sudo
@@ -26,7 +23,8 @@ RUN chown ${ISC_PACKAGE_MGRUSER}:${ISC_PACKAGE_IRISGROUP} /opt/irisapp
 USER ${ISC_PACKAGE_MGRUSER}
 
 # Copy source files to image
-COPY . /opt/irisapp
+COPY ./irisapp /opt/irisapp
+COPY ./server /opt/irisapp/server
 
 # load demo stuff
 RUN iris start IRIS \

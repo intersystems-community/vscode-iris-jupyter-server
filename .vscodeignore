@@ -3,7 +3,9 @@
 .vscode-test/**
 out/**
 node_modules/**
-intersystems-iris-native/**
+intersystems-iris-native/index.js
+intersystems-iris-native/package.json
+intersystems-iris-native/**/*.node
 irisapp/**
 src/**
 test/**

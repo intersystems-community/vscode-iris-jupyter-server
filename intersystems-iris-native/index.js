@@ -2,7 +2,7 @@
 /* eslint-disable eqeqeq */
 var native = null;
 
-if(process.platform == "win32" && process.arch == "x64") {
+if (process.platform == "win32" && process.arch == "x64") {
         // winx64
 	native = require('./bin/winx64/irisnative.node');
 /*
@@ -18,7 +18,7 @@ if(process.platform == "win32" && process.arch == "x64") {
         if (process.arch == "x64") {
             native = require('./bin/lnxubuntux64/irisnative.node');
         }
-        /*
+		/*
         else { // presumed ARM64 if linux not x64
             native = require('./bin/lnxubuntuarm64/irisnative.node');
         }
@@ -31,7 +31,7 @@ if(process.platform == "win32" && process.arch == "x64") {
     } else {
         // default to RH for now
         native = require('./bin/lnxrhx64/irisnative.node');
-    */
+	*/
     }
 }
 

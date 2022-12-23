@@ -54,15 +54,19 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run package",
+    "vscode:prepublish": "npm run webpack",
     "compile": "webpack",
     "watch": "webpack --watch",
-    "package": "webpack --mode production --devtool hidden-source-map",
+    "webpack": "webpack --mode production --devtool hidden-source-map",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "package-prep": "node -e \"require('fs').rmSync('./dist/', { recursive: true, force: true })",
+    "package:win32-x64": "npm run package-prep && node -e \"require('fs').cpSync('./intersystems-iris-native/bin/winx64/', './dist/', { recursive: true, filter: (f) => !f.endsWith('irisnative.node') })\" && vsce package --target win32-x64",
+    "package:linux-x64": "npm run package-prep && node -e \"require('fs').cpSync('./intersystems-iris-native/bin/lnxubuntux64/', './dist/', { recursive: true, filter: (f) => !f.endsWith('irisnative.node') })\" && vsce package --target linux-x64"
+
   },
   "dependencies": {
     "fastify": "^4.9.2",

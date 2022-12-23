@@ -42,6 +42,10 @@
 							"scheme": "http",
 							"host": "127.0.0.1",
 							"port": 52773
+						},
+						"superServer": {
+							"host": "127.0.0.1",
+							"port": 1972
 						}
 					}
 				},
@@ -61,10 +65,6 @@
 			},
 
 			// Add the IDs of extensions we want installed when the container is created.
-			// Currently (March 2022) `intersystems.language-server` fails to run within the container (alpine platform).
-			// Issue is probably https://github.com/intersystems/language-server/issues/185 and/or https://github.com/intersystems/language-server/issues/32
-			// Crash gets reported to the user, after which `intersystems-community.vscode-objectscript` falls back to
-			// using its TextMate grammar for code coloring.
 			"extensions": [
 				"ms-toolsai.jupyter",
 				"ms-toolsai.jupyter-renderers",

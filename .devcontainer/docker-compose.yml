@@ -3,8 +3,8 @@ services:
   iris:
     image: containers.intersystems.com/intersystems/iris-community:2022.3.0.555.0
     build:
-      context: ../irisapp/
-      dockerfile : Dockerfile
+      context: ../
+      dockerfile : irisapp/Dockerfile
       args:
         - IRIS_PASSWORD=${IRIS_PASSWORD:-SYS}
     entrypoint: sleep
