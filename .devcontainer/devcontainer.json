@@ -18,6 +18,7 @@
 		52773,
 		1972
 	],
+	"postCreateCommand": "npm install",
 	"postStartCommand": "iris start iris",
 
 	"customizations": {
@@ -31,6 +32,7 @@
 			"settings": {
 				"objectscript.conn" :{
 					"server": "devcontainer",
+					"ns": "USER",
 					"active": true
 				},
 				"objectscript.ignoreInstallLanguageServer": true,
