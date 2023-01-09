@@ -1,7 +1,6 @@
 version: '3.7'
 services:
   iris:
-    image: containers.intersystems.com/intersystems/iris-community:2022.3.0.570.0
     build:
       context: ../
       dockerfile : irisapp/Dockerfile

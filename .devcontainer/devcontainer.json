@@ -18,7 +18,7 @@
 		52773,
 		1972
 	],
-	"postCreateCommand": "npm install",
+	"postCreateCommand": "mkdir -p dist && cp intersystems-iris-native/bin/lnxubuntux64/*.so dist && npm install",
 	"postStartCommand": "iris start iris",
 
 	"customizations": {
