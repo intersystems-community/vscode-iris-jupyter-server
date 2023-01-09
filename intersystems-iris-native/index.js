@@ -8,9 +8,9 @@ if (process.platform == "win32" && process.arch == "x64") {
 /*
 } else if (process.platform == "win32" && process.arch == "ia32") {
 	native = require('./bin/winx86/irisnative.node');
+*/
 } else if (process.platform == "darwin") {
     native = require('./bin/macx64/irisnative.node');
-*/
 } else if (process.platform == "linux") {
     let distro = getLinuxDistro()
     console.log('platform = ' + process.platform + ': ' + distro + ': ' + process.arch);
