@@ -113,6 +113,11 @@ ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %St
 			}
 		}
 		elseif $$$type = "python" {
+
+			// Briefly switch to the implied namespace of the current namespace's global database
+			// as a workaround for the bug in which Embedded Python output sometimes gets mangled.
+			xecute "new $namespace set $namespace = ""^"_##class(%SYS.Namespace).GetGlobalDest()_""""
+
 			set $$$stdiomode = ##class(%SYS.Python).SetStdIOMode(3)
 			set $$$sc = ##class(%SYS.Python).Run($$$vstrCommand)
 			if $$$sc = -1 {
