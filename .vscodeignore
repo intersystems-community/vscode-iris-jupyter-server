@@ -1,4 +1,6 @@
+.conda/**
 .devcontainer/**
+.venv/**
 .vscode/**
 .vscode-test/**
 out/**
@@ -9,6 +11,8 @@ intersystems-iris-native/**/*.node
 irisapp/**
 src/**
 test/**
+test/.conda/**
+test/.venv/**
 .eslintignore
 .gitignore
 .yarnrc
