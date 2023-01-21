@@ -5,7 +5,7 @@ import { ApiBase, IRequestGeneric, IRouteGeneric } from "../api";
 import { JupyterServerAPI } from "../jupyterServerAPI";
 import { ServerNamespaceMgr } from "../serverNamespaceMgr";
 import console = require("console");
-
+import * as JSON5 from "json5";
 
 interface IRequestKernel extends IRequestGeneric {
 	Params: {
@@ -154,13 +154,33 @@ export class KernelsApi extends ApiBase {
 					};
 
 					const sendResult = (output: string, executionCount: number) => {
+						const data = {'text/plain': output};
+						const fnProcess = (text: string) => {
+							const jsonOutput = JSON5.parse(text);
+							Object.keys(jsonOutput)
+								.filter((key) => key.endsWith('+json'))
+								.forEach((key) => Object.assign(data, {[key]: jsonOutput[key]}));
+						};
+						try {
+							fnProcess(output);
+						} catch (error: any) {
+							const match = (error.message as string).match(/^JSON5: invalid character '([TF])' at /);
+							if (match) {
+								try {
+									fnProcess(output.replace(/: True/g, ': true').replace(/: False/g, ': false'));
+								} catch (error2: any) {
+									console.log(`Failed to reparse output as JSON5: ${error2.message}`);
+								}
+							}
+							else {
+								console.log(`Failed to parse output as JSON5: ${error.message}`);
+							}
+						}
 						const msg = nteract.createMessage('execute_result', {
 							parent_header: message.header,
 							content: {
 								execution_count: executionCount,
-								data: {
-									'text/plain': output
-								},
+								data,
 								metadata: {}
 							}
 						});
