@@ -5,7 +5,7 @@ import { ApiBase, IRequestGeneric, IRouteGeneric } from "../api";
 import { JupyterServerAPI } from "../jupyterServerAPI";
 import { ServerNamespaceMgr } from "../serverNamespaceMgr";
 import console = require("console");
-import * as JSON5 from "json5";
+import json5 = require("json5");
 
 interface IRequestKernel extends IRequestGeneric {
 	Params: {
@@ -154,26 +154,42 @@ export class KernelsApi extends ApiBase {
 					};
 
 					const sendResult = (output: string, executionCount: number) => {
+
+						// Default output format is plain text
 						const data = {'text/plain': output};
-						const fnProcess = (text: string) => {
-							const jsonOutput = JSON5.parse(text);
-							Object.keys(jsonOutput)
+
+						// Special case for plotly output - see https://github.com/plotly/plotly.py/issues/4030
+						// which gives us a Python string representation of the Figure object, not a true JSON one
+						const rePlotly = /^\{'(application\/vnd\.plotly\.v1\+json)':(.+)\}/;
+						const matchPlotly = output.match(rePlotly);
+						if (matchPlotly) {
+							let content = matchPlotly[2];
+
+							// Make the Python string representation of booleans conform to JSON's
+							content = content.replace(/': True/g, '\': true');
+							content = content.replace(/': False/g, '\': false');
+
+							// Leverage JSON5's acceptance of singlequotes to normalize to doublequotes
+							content = JSON.stringify(json5.parse(content));
+
+							// Add it
+							Object.assign(data, {[matchPlotly[1]]: content});
+						}
+						else if (output.match(/^\{"/)) {
+							// Looks like JSON
+							// TODO: add example of Python library which produces this sort of output
+							const fnProcess = (text: string) => {
+								const jsonOutput = JSON.parse(text);
+
+								// Add root objects that could be JSON-formatted strings
+								Object.keys(jsonOutput)
 								.filter((key) => key.endsWith('+json'))
 								.forEach((key) => Object.assign(data, {[key]: jsonOutput[key]}));
-						};
-						try {
-							fnProcess(output);
-						} catch (error: any) {
-							const match = (error.message as string).match(/^JSON5: invalid character '([TF])' at /);
-							if (match) {
-								try {
-									fnProcess(output.replace(/: True/g, ': true').replace(/: False/g, ': false'));
-								} catch (error2: any) {
-									console.log(`Failed to reparse output as JSON5: ${error2.message}`);
-								}
-							}
-							else {
-								console.log(`Failed to parse output as JSON5: ${error.message}`);
+							};
+							try {
+								fnProcess(output);
+							} catch (error: any) {
+								console.log(`Failed to parse output as JSON: ${error.message}`);
 							}
 						}
 						const msg = nteract.createMessage('execute_result', {
