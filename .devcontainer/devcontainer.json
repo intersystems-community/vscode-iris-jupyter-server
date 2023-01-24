@@ -61,9 +61,11 @@
 						"args": [
 							"session",
 							"iris"
-						]
+						],
+						"overrideName": true
 					}
-				}
+				},
+				"terminal.integrated.defaultProfile.linux": "bash"
 			},
 
 			// Add the IDs of extensions we want installed when the container is created.
