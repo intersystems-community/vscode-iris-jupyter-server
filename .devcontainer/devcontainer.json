@@ -14,9 +14,12 @@
 
 	// The next set of lines are for Codespaces
 	"remoteUser": "irisowner",
+
+	// Explicitly forwarding these ports prevents IRIS from starting in the container when this VS Code workspace is "reopened in a container".
+	// Are the lines actually needed for Codespaces?
 	"forwardPorts": [
-		52773,
-		1972
+		//52773,
+		//1972
 	],
 	"postCreateCommand": "mkdir -p dist && cp intersystems-iris-native/bin/lnxubuntux64/*.so dist && npm install",
 	"postStartCommand": "iris start iris",
