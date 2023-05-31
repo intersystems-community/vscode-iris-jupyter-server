@@ -33,17 +33,10 @@
     "onNotebook:jupyter-notebook",
     "onCommand:jupyter.selectjupyteruri",
     "onCommand:switchToRemoteKernels",
-    "onCommand:switchToAnotherRemoteKernels",
-    "onCommand:iris-jupyter-server.helloWorld"
+    "onCommand:switchToAnotherRemoteKernels"
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "iris-jupyter-server.helloWorld",
-        "title": "Hello World"
-      }
-    ],
     "languages": [
       {
         "id": "iris-polyglot",
