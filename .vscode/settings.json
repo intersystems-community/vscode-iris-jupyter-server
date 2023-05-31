@@ -14,4 +14,7 @@
 		"folder": "server/src",
 		"mapped": false
 	},
+	"objectscript.conn": {
+        "active": true
+    },
 }

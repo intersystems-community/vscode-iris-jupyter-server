@@ -2,7 +2,15 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"name": "devcontainer:USER",
+			"uri": "isfs://devcontainer:user/"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"objectscript.conn": {
+			"active": true
+		}
+	}
 }
