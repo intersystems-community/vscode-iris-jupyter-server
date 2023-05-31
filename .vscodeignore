@@ -4,7 +4,6 @@
 .vscode/**
 .vscode-test/**
 out/**
-node_modules/**
 intersystems-iris-native/index.js
 intersystems-iris-native/package.json
 intersystems-iris-native/**/*.node
