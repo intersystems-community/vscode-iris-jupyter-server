@@ -217,10 +217,12 @@ export class MiscApi extends ApiBase {
 			}
 			addSpec('iris-polyglot', 'iris-polyglot', 'Polyglot IRIS');
 
-			return {
+			const result = {
 				default: dfltSpec,
 				kernelspecs: Object.fromEntries(specs)
 			};
+			console.log(`/:serverNamespace/api/kernelspecs GET - result: ${JSON.stringify(result)}`);
+			return result;
 		});
 	}
 }
