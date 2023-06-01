@@ -2,6 +2,24 @@
 Class PolyglotKernel.CodeExecutor
 {
 
+/// SQL function returning superserver port number,
+/// enabling client using /api/atelier to leverage other connectivity, e.g. Node.js Native API
+/// provided firewalling and routing allows.
+/// Use /api/atelier/v1/:namespace/action/query to SELECT PolyglotKernel.CodeExecutor_SuperServerPort()
+ClassMethod SuperServerPort() As %Integer [ SqlProc ]
+{
+	return $S($G(^%SYS("SSPort"))'="":^%SYS("SSPort"),1:1972)
+}
+
+/// SQL function returning uppercased FQDN of host,
+/// enabling client using /api/atelier to leverage other connectivity, e.g. Node.js Native API
+/// provided firewalling and routing allows.
+/// Use /api/atelier/v1/:namespace/action/query to SELECT PolyglotKernel.CodeExecutor_HostName()
+ClassMethod HostName() As %String [ SqlProc ]
+{
+	return ##class(%SYS.System).GetNodeName()
+}
+
 ClassMethod Init(clientJSON As %String) As %String
 {
 	// Kill the %-variables which the Native API for Node.js initially creates in its server-side process, as they seem to be redundant.
