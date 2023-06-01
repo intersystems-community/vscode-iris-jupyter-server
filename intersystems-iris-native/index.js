@@ -1,37 +1,81 @@
 /* eslint-disable @typescript-eslint/semi */
 /* eslint-disable eqeqeq */
 var native = null;
+const path = require('path');
 
-if (process.platform == "win32" && process.arch == "x64") {
-        // winx64
-	native = require('./bin/winx64/irisnative.node');
-/*
-} else if (process.platform == "win32" && process.arch == "ia32") {
-	native = require('./bin/winx86/irisnative.node');
-*/
-} else if (process.platform == "darwin") {
-    native = require('./bin/macx64/irisnative.node');
-} else if (process.platform == "linux") {
-    let distro = getLinuxDistro()
-    console.log('platform = ' + process.platform + ': ' + distro + ': ' + process.arch);
-    if (distro == 'ubuntu') {
-        if (process.arch == "x64") {
-            native = require('./bin/lnxubuntux64/irisnative.node');
+try {
+    let platname = get_platname().trim()
+    if (platname == 'winamd64') platname = 'winx64'
+    console.log("Platform name: ", platname)
+    native = require('./bin/' + platname + '/irisnative.node');
+} catch (e) {
+    // if cplatname fails, try the old method of requiring
+    backup_require()
+}
+
+function get_platname(){
+    // get platform name from releng cplatname script
+    const { execSync } = require('child_process');
+    let platname = execSync('sh ' + path.join(__dirname, 'cplatname') + ' identify', {encoding:'utf8',stdio:'pipe'});
+    return platname
+}
+
+function backup_require(){
+    if(process.platform == "win32" && process.arch == "x64") {
+    // winx64
+        native = require('./bin/winx64/irisnative.node');
+    } else if (process.platform == "win32" && process.arch == "ia32") {
+        native = require('./bin/winx86/irisnative.node');
+    } else if (process.platform == "darwin") {
+        if (process.arch == 'x64') {
+            native = require('./bin/macx64/irisnative.node');
+        } else {
+            native = require('./bin/macos/irisnative.node');
         }
-		/*
-        else { // presumed ARM64 if linux not x64
-            native = require('./bin/lnxubuntuarm64/irisnative.node');
+    } else if (process.platform == "linux") {
+        let [distro, versionID] = getLinuxDistro()
+        console.log('platform = ' + process.platform + ': ' + distro + ': ' + process.arch);
+        if (distro == 'ubuntu') {
+            versionValue = versionID.replace('.', '')
+            if (!['1804', '2004', '2204'].includes(versionValue)) { // not in supported versions
+                versionID = '' // default to lnxubuntu with no version
+            }
+            if (process.arch == 'arm64') {
+                native = require(`./bin/lnxubuntu${versionValue}arm64/irisnative.node`);
+            } else if (process.arch == 'x64') {
+                native = require(`./bin/lnxubuntu${versionValue}x64/irisnative.node`);
+            }
+        } else if (distro == 'fedora') {
+            native = require('./bin/lnxrhx64/irisnative.node');
+        } else if (distro == 'rhx64') {
+            native = require('./bin/lnxrhx64/irisnative.node');
+        } else if (distro == 'rhel' || distro == 'ol') {
+            major = versionID.split('.')[0]
+
+            if ( process.arch == 'arm64') {
+                if (major == '9') {
+                    native = require('./bin/lnxrh9arm64/irisnative.node');
+                } else {
+                    native = require('./bin/lnxrharm64/irisnative.node');
+                }
+            } else if (process.arch == 'x64') {
+                if (['7', '8', '9'].contains(major)) {
+                    native = require(`./bin/lnxrh${major}x64/irisnative.node`);
+                } else { // default to lnxrhx64
+                    native = require(`./bin/lnxrhx64/irisnative.node`);
+                }
+            }
+        } else if (distro == 'sles' && process.arch == 'x64') {
+            native = require('./bin/lnxsuse15x64/irisnative.node');
+        } else {
+            // default to RH for now
+            try {
+                native = require('./bin/lnxrhx64/irisnative.node');
+            } catch {
+                throw 'The required irisnative.node module cannot be found for this distribution of Linux: '
+                +  process.platform + ': ' + distro + ': ' + process.arch + ': ' + versionID
+            }
         }
-    } else if (distro == 'fedora') {
-        native = require('./bin/lnxrhx64/irisnative.node');
-    } else if (distro == 'rhx64') {
-        native = require('./bin/lnxrhx64/irisnative.node');
-    } else if (distro == 'rhel' && process.arch == 'arm64') {
-        native = require('./bin/lnxrharm64/irisnative.node');
-    } else {
-        // default to RH for now
-        native = require('./bin/lnxrhx64/irisnative.node');
-	*/
     }
 }
 
@@ -39,7 +83,10 @@ function getLinuxDistro() {
     const { execSync } = require('child_process');
     try {
         let distro = execSync('lsb_release -is',{encoding:'utf8',stdio:'pipe'});
-        return distro.replace(/(\r\n\t|\n|\r\t)/gm,"").toLowerCase();
+        let versionID = execSync('lsb_release -rs',{encoding:'utf8',stdio:'pipe'});
+        let result = [distro.replace(/(\r\n\t|\n|\r\t)/gm,"").toLowerCase(),
+                        versionID.replace(/(\r\n\t|\n|\r\t)/gm,"").toLowerCase()]
+        return result
     } catch (e) {
         return getDistroFromFile();
     }
@@ -51,7 +98,9 @@ function getDistroFromFile() {
         let osv = fs.readFileSync('/etc/os-release','utf8');
         let lines = osv.split('\n');
         let distro = lines.find((element) => { return element.substring(0,element.indexOf('=')) == 'ID' })
-        return distro.substring(3).replace(/["]+/g,'');
+        let versionID = lines.find((element) => { return element.substring(0,element.indexOf('=')) == 'VERSION_ID' })
+        let result = [distro.substring(3).replace(/["]+/g,''), versionID.substring(11).replace(/["]+/g,'')]
+        return result
     } catch (e) {
         return null;
     }

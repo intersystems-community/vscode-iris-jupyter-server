@@ -1,0 +1,377 @@
+#!/bin/sh
+:
+#	cplatname
+#
+#	This tool converts between platform information and the IRIS
+#	internal names used for indexing file sets.
+#
+#	Copyright (c) 2001-2018 by InterSystems.
+#	Cambridge, Massachusetts, U.S.A.  All rights reserved.
+#	Confidential, unpublished property of InterSystems.
+#
+#	cplatname identify
+#		Attempt to identify the current kernel platform, using local
+#		system commands. All supported kernel platforms are displayed.
+#
+#	cplatname display <name>
+#		For a given IRIS internal name, display the platform
+#		description.
+#
+#	cplatname endian <name>
+#		For a given IRIS internal name, display the hardware endian
+#		orientation (big or little).
+#
+#	cplatname platform_family <kernel>
+#		For a given IRIS kernel platform name, display the platform
+#		family name.
+#
+#	======================================================================
+
+not_in_docker() {
+    [ Linux = `uname -s` ] || return 0
+
+    [ -r /proc/1/sched ] || return $?
+
+    sed 1q /proc/1/sched | fgrep '(1,' >/dev/null \
+            || return $?
+
+    if fgrep :/docker/ /proc/1/cgroup >/dev/null
+    then false
+    else
+	case "`cat /proc/1/sched | head -n 1 | awk '{print $1}'`" in
+	systemd) return 0 ;;
+	init*)    return 0 ;;
+	*)	 return 1 ;;
+	esac
+    fi
+}
+
+case $1 in
+    identify)
+	plat=""
+	opsys=`uname -s`
+	case $opsys in
+	    AIX)
+		tl_required_72=5
+		tl_required_73=0
+		osver=`uname -v`
+		osminver=`uname -r`
+		tlver=`oslevel -s | cut -d- -f2`
+		if [ "$osver$osminver" -ge 72 ]		# Minumum aix7.2
+		then
+			# check for minimum TL level
+			tl_required_var=$( eval "echo tl_required_$osver$osminver" )
+			tl_required=$( eval "echo \$$tl_required_var" )
+			if [ -n "$tl_required" ] ; then
+			    tlver=`oslevel -s | cut -d- -f2`
+			    if [ "$tlver" -lt "$tl_required" ] ; then	# if 72, tl>=5; if 73, tl>=0
+					if [ "$2" = "extended" ] ; then
+						plat="^AIX ${osver}.${osminver} TL${tl_required} or higher is required."
+					fi
+			    else
+                    plat="aix"
+			    fi
+			else
+                plat="aix"
+			fi
+		fi
+		;;
+	    Darwin)						#JLC622+
+		proc=`uname -m`
+		case $proc in					#JLC795+
+		   x86_64)
+			majver=`uname -r | cut -f1 -d.`
+			# -------------   -----------------------            
+			# POSIX (uname)   macOS release (sw_vers)
+			# -------------   -----------------------
+			#   17.x.x          10.13.x   High Sierra
+			#   18.x.x          10.14.x   Mojave
+			#   19.x.x          10.15.x   Catalina
+			#   20.x.x          11.x      Big Sur
+			#   21.x.x          12.x      Monterey
+			if [ "$majver" -lt "19" ] ; then
+				plat=""
+			else
+			    plat=macx64
+			fi ;;
+		   arm64)   plat="macos";;
+		esac						#JLC795-
+		;;						#JLC622-
+	    HP-UX)
+		kernel=`getconf KERNEL_BITS 2>/dev/null`	#LRS551+,LRS677+
+		proc=`uname -m`					#JLC402+
+		rel=`uname -r`
+		case $proc in
+		    ia64)	plat=hpit ;;
+		    itanium)	plat=hpit ;;
+		    *)						#JLC402-
+			case $kernel in
+			   32)
+			   	case $rel in
+				     "B.11.11") plat="" ;;
+				     "B.11.00") plat="" ;;
+				esac
+				;;
+			   64)	plat="hp64" ;;	# 64-bit
+			esac					#LRS551-,LRS677-
+			;;					#JLC402
+		esac						#JLC402
+		;;
+	    Linux)
+		proc=`uname -m`
+		if [ -f /etc/os-release ]
+		then
+		    . /etc/os-release
+   		    ver_major=`echo $VERSION_ID | cut -d. -f1 | tr -cd '0-9'`
+		    ver_minor=`echo $VERSION_ID | cut -d. -f2 | tr -cd '0-9'`
+
+                    if [ "$ID" = "ubuntu" ]
+                    then
+                	if [ "$VERSION_ID" = "18.04" -o "$VERSION_ID" = "20.04" -o "$VERSION_ID" = "22.04" ]
+                	then
+                	    case "$proc" in
+                    	    ppc64le)
+                        	plat=lnxubuntuppc64le
+                        	;;
+                    	    aarch64)
+                        	plat=lnxubuntuarm64
+							case "$VERSION_ID" in
+	                    	    18*) plat=lnxubuntu1804arm64 ;;
+	                    	    20*) plat=lnxubuntu2004arm64 ;;
+	                    	    22*) plat=lnxubuntu2204arm64 ;;
+	                        esac
+                        	;;
+                    	    x86_64)
+                    	    	if not_in_docker
+                    	    	then
+	                    	    	case "$VERSION_ID" in
+	                    	    		18*) plat=lnxubuntu1804x64 ;;
+	                    	    		20*) plat=lnxubuntu2004x64 ;;
+	                    	    		22*) plat=lnxubuntu2204x64 ;;
+	                                esac
+	                            else
+	                            	plat=lnxubuntux64
+	                            fi ;;
+                    	    esac
+
+                            # if not_in_docker ; then ...
+                            if not_in_docker
+                            then
+                                : # not docker container, regular Ubuntu
+                            else
+                                # else we are in docker container
+                                plat=`
+                                    if [ "$2" != "extended" ]
+                                    then
+                                        # docker container -> docker Ubuntu
+                                        # plat= (for example)
+                                        #  "lnxubuntux64"  ->"dockerubuntux64"
+                                        #  "lnxubuntuarm64"->"dockerubuntuarm64"
+                                        echo "$plat"
+                                    else
+                                        # both docker and non-docker can install
+                                        #   inside container
+                                        # plat= (for example)
+                                        #  "lnxubuntux64 lnxubuntux64"
+                                        #  -> "dockerubuntux64 lnxubuntux64"
+                                        #  "lnxubuntuarm64 lnxubuntuarm64"
+                                        #  -> "dockerubuntuarm64 lnxubuntuarm64"
+                                        echo "$plat $plat"
+                                    fi \
+                                    | sed \
+                                        -e 's/lnx/docker/' \
+                                        -e 's/\(dockerubuntu\)[0-9]*/\1/g'
+                                    # there is only 'dockerubuntu{x,arm}64',
+                                    # never 'dockerubuntu{18,20}04{x,arm}64'
+                                `
+                            fi # else: not in docker
+                    	fi # if 16.04, 18.04, 20.04
+                    fi # Ubuntu
+		    if [ "$NAME" = "SLES" -a "$proc" = "x86_64" ]
+		    then
+			if [ -n "$ver_major" -a -n "$ver_minor" ]
+			then
+			    [ "$ver_major" -eq "15" -a "$ver_minor" -ge "3" ] && plat=lnxsuse15x64
+			fi
+		    fi #SUSE
+
+		    # Red Hat and Oracle use the same versioning schema
+		    if [ "$ID" = "rhel" -o "$ID" = "ol" ] 
+		    then
+			if [ -n "$ver_major" -a -n "$ver_minor" ]
+			then
+			    case $proc in
+			    x86_64) 
+				    [ "$ver_major" -eq "7" -a "$ver_minor" -ge "9" ] && plat=lnxrh7x64
+				    [ "$ver_major" -eq "8" -a "$ver_minor" -ge "2" ] && plat=lnxrh8x64
+				    [ "$ver_major" -eq "9" ] && plat=lnxrh9x64
+				    ;;
+			    ppc64)    plat=lnxrhppc64 ;;
+			    ppc64le)  plat=lnxrhppc64le ;;
+			    aarch64)
+				    [ "$ver_major" -eq "8" -a "$ver_minor" -ge "2" ] && plat=lnxrharm64
+				    [ "$ver_major" -eq "9" -a "$ver_minor" -ge "0" ] && plat=lnxrh9arm64
+				    ;;
+			    esac
+			fi
+		    fi
+		fi
+		# CentOS does not list minor versions in /etc/os-release
+		if [ -f /etc/centos-release ]
+		then
+		    if grep -Fq 'release 7.9' /etc/centos-release
+		    then
+		        case $proc in
+		        x86_64)     plat=lnxrh7x64 ;;
+		        esac
+		    fi
+		fi
+		if [ -f /etc/debian_version ]
+		then
+		    case $proc in
+			armv6l)   plat=lnxdebarm ;;
+			armv7l)	  plat=lnxdebarm ;;
+		    esac
+	        fi
+		if [ -f /etc/openwrt_version ]
+		then
+		    case $proc in
+			mips)    plat=lnxiotmipsle ;;
+		    esac
+	        fi
+		;;
+	    OSF1)
+		osrel=`uname -r`				#LRS453+
+		case $osrel in
+		    *5.1*)					#ALE29+
+			osver=`uname -v`			#ALE710+
+			if [ "$osver" -ge 2650 ]
+			then
+				plat="decunix5"
+				if [ -x /usr/sbin/clu_get_info ]
+				then
+					/usr/sbin/clu_get_info 1>/dev/null 2>/dev/null
+					if [ "$?" -eq 0 ]
+					then
+						plat="decunix5 decunix5clu"
+					fi
+				fi
+                        fi					#ALE710-
+                        ;;					#ALE29-
+		esac						#LRS453-
+		;;
+	    SunOS)
+		mach=`uname -p`
+		bit=`isainfo -b`				#JLC796+
+		majrev=`uname -r | cut -f1 -d"."`
+		minrev=`uname -r | cut -f2 -d"."`
+		if [ "$majrev$minrev" -ge "510" ] ; then
+		    case $mach in
+		    	i386)
+			    case $bit in
+				64) plat=solx64 ;;
+			    esac
+			    ;;
+			sparc)
+			    case $bit in			#JLC796-
+				64) plat=usparc ;;
+			    esac
+			    ;;
+		    esac
+		fi
+		;;
+	    CYGWIN_NT-*|Windows_NT)
+		# Detect Cygwin/MKS
+		plat=winx86
+		cpu=$PROCESSOR_ARCHITEW6432
+		if [ -z $cpu ]; then
+			cpu=$PROCESSOR_ARCHITECTURE
+		fi
+		case $cpu in
+			x86)		bit=32 ;;
+			AMD64|EMT64)	plat=winamd64
+					bit=64 ;;
+			*)		bit=32 ;;
+		esac
+		;;
+	esac
+	echo $plat
+	;;
+    display)
+	case $2 in
+	    decunix5)		echo "HP Tru64 UNIX 5.1B" ;;
+	    decunix5clu)	echo "HP Tru64 UNIX 5.1B Active/Active Clusters" ;;
+	    hp64)		echo "HP RISC/64-bit" ;;		#LRS551-
+	    hpit)		echo "HP-UX/Itanium" ;;			#JLC402
+	    lnxrhx86)		echo "Red Hat Enterprise Linux (Intel)" ;;
+	    lnxrh7x64)		echo "Red Hat Enterprise Linux 7 (x64)" ;;
+	    lnxrh8x64)		echo "Red Hat Enterprise Linux 8 (x64)" ;;
+	    lnxrh9x64)		echo "Red Hat Enterprise Linux 9 (x64)" ;;
+	    lnxrharm64)	    echo "Red Hat Enterprise Linux 8 (ARM64)" ;;
+        lnxrh9arm64)	echo "Red Hat Enterprise Linux 9 (ARM64)" ;;
+	    lnxrhppc64)		echo "Red Hat Enterprise Linux (PowerPC64)" ;;
+	    lnxrhppc64le)	echo "Red Hat Enterprise Linux (PowerPC64LE)" ;;
+	    lnxsusex86)		echo "SuSE Linux Enterprise Server (Intel)" ;;
+	    lnxsuse*x64)		echo "SuSE Linux Enterprise Server (x64)" ;;
+	    lnxubuntu1804x64)	echo "Ubuntu 18.04 LTS (x64)" ;;
+		lnxubuntu2004x64)	echo "Ubuntu 20.04 LTS (x64)" ;;
+		lnxubuntu2204x64)	echo "Ubuntu 22.04 LTS (x64)" ;;
+	    dockerubuntux64)	echo "Docker Ubuntu LTS (x64)" ;;
+	    lnxubuntuppc64le)	echo "Ubuntu LTS (ppc64le)" ;;
+		lnxubuntu1804arm64)	echo "Ubuntu 18.04 LTS (ARM64)" ;;
+		lnxubuntu2004arm64)	echo "Ubuntu 20.04 LTS (ARM64)" ;;
+		lnxubuntu2204arm64)	echo "Ubuntu 22.04 LTS (ARM64)" ;;
+		dockerubuntuarm64)	echo "Docker Ubuntu LTS (ARM64)" ;;
+	    lnxdebarm)		echo "Debian Linux (ARM)" ;;
+	    lnxiotmipsle)	echo "OpenWrt Linux (MIPSLE)" ;;
+	    macos)		echo "macOS/Apple Silicon" ;;
+	    macx64)		echo "Mac OS X/x86/64-bit" ;;		#JLC1035
+	    ppc)		echo "AIX System-p/32-bit" ;;		#LRS553+
+	    ppc64)		echo "AIX System-p/64-bit" ;;		#LRS639
+	    aix)		echo "IBM AIX 7.2/AIX 7.3 OpenSSL 1.0.2" ;;
+	    aixopenssl30)		echo "IBM AIX 7.2/AIX 7.3 OpenSSL 3.0" ;;
+	    solx64)		echo "Solaris/x64" ;;			#JLC796
+	    usparc)		echo "Solaris 64-bit SPARC" ;;		#LRS453
+	    lnxrhriscv64)	echo "Red Hat Enterprise Linux (RISC-V64)" ;;
+	    *)			echo "unknown" ;;
+	esac
+	;;
+    endian)
+	case $2 in
+	    decunix5)		echo little ;;				#LRS453
+	    decunix5clu)	echo little ;;				#ALE31
+	    hp64)		echo big ;;				#LRS551
+	    hpit)		echo big ;;				#JLC402
+	    lnxrh*arm64) 	echo little ;;
+	    lnxrh*x64)		echo little ;;
+	    lnxrhx86)		echo little ;;
+	    lnxrhppc64)		echo big ;;
+	    lnxrhppc64le)	echo little ;;
+	    lnxsusex86)		echo little ;;
+	    lnxsuse*x64)		echo little ;;
+	    lnxubuntu*x64)	echo little ;;
+	    dockerubuntux64)	echo little ;;
+	    lnxubuntuppc64le)	echo little ;;
+	    lnxubuntu*arm64)	echo little ;;
+        dockerubuntuarm64)	echo little ;;
+	    lnxdebarm)		echo little ;;
+	    lnxiotmipsle)	echo little ;;
+	    macos)		echo little ;;
+	    macx64)		echo little ;;				#JLC1035
+	    ppc)		echo big ;;
+	    ppc64)		echo big ;;				#LRS553
+		aix)		echo big ;;
+		aixopenssl30)		echo big ;;
+	    solx64)		echo little ;;				#JLC796
+	    usparc)		echo big ;;
+	    lnxrhriscv64)	echo little ;;
+	    *)			echo unknown ;;
+	esac
+	;;
+    platform_family)
+	case $2 in
+	    decunix5clu)	echo decunix5 ;;
+	    *)			echo $2 ;;
+	esac
+	;;
+esac
