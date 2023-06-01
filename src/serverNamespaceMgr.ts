@@ -97,8 +97,4 @@ export class ServerNamespaceMgr extends Disposable {
 		this.target = target;
 		serverNamespaceMgrMap.set(this._key, this);
 	}
-
-	dispose() {
-		serverNamespaceMgrMap.delete(this._key);
-	}
 }
