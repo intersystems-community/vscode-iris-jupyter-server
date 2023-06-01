@@ -6,12 +6,14 @@ import { MiscApi } from './api';
 import { SessionsApi } from './api/sessions';
 //import { ContentsApi } from './api/contents';
 
+export let extensionUri: vscode.Uri;
 
 export function activate(context: vscode.ExtensionContext) {
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "iris-jupyter-server" is now active!');
+	console.log('Extension "iris-jupyter-server" is activating');
+	extensionUri = context.extensionUri;
 
 	const fastify = Fastify({
 		//logger: true

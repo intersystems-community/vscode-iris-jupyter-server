@@ -11,6 +11,9 @@ import * as serverManager from '@intersystems-community/intersystems-servermanag
 import { IServerSpec, Server } from './server';
 import { ServerNamespaceMgr } from './serverNamespaceMgr';
 import { JupyterServerAPI } from './jupyterServerAPI';
+import { logoutREST, makeRESTRequest } from './makeRESTRequest';
+import { extensionUri } from './extension';
+import { Mutex } from 'async-mutex';
 
 // Our interfaces
 export interface ITarget {
@@ -46,72 +49,133 @@ let serverManagerApi: any;
 
 export abstract class ApiBase {
 
+	private static mutex = new Mutex();
 	static async getTarget(serverNamespace: string): Promise<ITarget> {
-		const serverNamespaceMgr = ServerNamespaceMgr.get(serverNamespace);
-		if (serverNamespaceMgr) {
-			return serverNamespaceMgr.target;
-		}
+		return await ApiBase.mutex.runExclusive(async () => {
 
-		const resolveTarget = (async (): Promise<ITarget> => {
-			const parts = serverNamespace.split(':');
-			const namespace = parts[1].toUpperCase();
-			if (parts.length === 2) {
-				const serverName = parts[0].toLowerCase();
-				let serverSpec = Server.get(serverName);
-				if (serverSpec) {
-					return { server: serverName, namespace, serverSpec };
-				}
-				if (typeof serverManagerApi === 'undefined') {
-					let extension;
-					extension = vscode.extensions.getExtension(serverManager.EXTENSION_ID);
-					if (!extension) {
-					// Maybe ask user for permission to install Server Manager
-					await vscode.commands.executeCommand('workbench.extensions.installExtension', serverManager.EXTENSION_ID);
-					extension = vscode.extensions.getExtension(serverManager.EXTENSION_ID);
-					}
-					if (!extension) {
-						return { server: '', namespace: ''};
-					}
-					if (!extension.isActive) {
-					await extension.activate();
-					}
-					serverManagerApi = extension.exports;
-				}
-				if (serverManagerApi && serverManagerApi.getServerSpec) {
-					serverSpec = await serverManagerApi.getServerSpec(serverName) as serverManager.IServerSpec;
-					if (!serverSpec) {
-						return { server: serverName, namespace };
-					}
-					if (typeof serverSpec.password === 'undefined') {
-						const scopes = [serverSpec.name, serverSpec.username || ''];
-						let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
-						if (!session) {
-							session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
-						}
-						if (session) {
-							serverSpec.username = session.scopes[1];
-							serverSpec.password = session.accessToken;
-						}
-						else {
-							throw new Error('Cannot fetch credentials');
-						}
-					}
-					const server = new Server(serverSpec);
-					Server.set(serverName, serverSpec);
-					return { server: serverName, namespace, serverSpec };
-				}
-				return { server: serverName, namespace };
+			const serverNamespaceMgr = ServerNamespaceMgr.get(serverNamespace);
+			if (serverNamespaceMgr) {
+				return serverNamespaceMgr.target;
 			}
-			return { server: '', namespace: ''};
+
+			const loadAndCompile = (async (serverSpec: IServerSpec, namespace: string): Promise<void> => {
+				const fileUri = vscode.Uri.joinPath(extensionUri, 'server/src/PolyglotKernel/CodeExecutor.cls');
+				const name = 'PolyglotKernel.CodeExecutor.cls';
+				const content = (await vscode.workspace.fs.readFile(fileUri)).toString().split('\n');
+				//const name = 'YJMpushed.int';
+				//const content: string[] = ['ROUTINE YJMpushed [Type=INT]', 'YJMpushed ;stub', ' write "Hello"', ' quit'];
+				let response = await makeRESTRequest(
+					'PUT',
+					serverSpec,
+					{ apiVersion: 1, namespace, path: `/doc/${name}?ignoreConflict=1` },
+					{ enc: false, content, mtime: 0 }
+				);
+				if (!response || ![200, 201].includes(response.status)) {
+					throw new Error(`Bootstrap load failed: ${response?.data.status.summary}`);
+				}
+				response = await makeRESTRequest(
+					'POST',
+					serverSpec,
+					{ apiVersion: 1, namespace, path: '/action/compile' },
+					[name]
+				);
+				if (response?.status !== 200) {
+					throw new Error(`Bootstrap compile failed: ${response?.data.status.summary}`);
+				}
+				return;
+			});
+
+			const resolveTarget = (async (): Promise<ITarget> => {
+				const parts = serverNamespace.split(':');
+				const namespace = parts[1].toUpperCase();
+				if (parts.length === 2) {
+					const serverName = parts[0].toLowerCase();
+					let serverSpec = Server.get(serverName);
+					if (serverSpec) {
+						return { server: serverName, namespace, serverSpec };
+					}
+					if (typeof serverManagerApi === 'undefined') {
+						let extension;
+						extension = vscode.extensions.getExtension(serverManager.EXTENSION_ID);
+						if (!extension) {
+						// Maybe ask user for permission to install Server Manager
+						await vscode.commands.executeCommand('workbench.extensions.installExtension', serverManager.EXTENSION_ID);
+						extension = vscode.extensions.getExtension(serverManager.EXTENSION_ID);
+						}
+						if (!extension) {
+							return { server: '', namespace: ''};
+						}
+						if (!extension.isActive) {
+						await extension.activate();
+						}
+						serverManagerApi = extension.exports;
+					}
+					if (serverManagerApi && serverManagerApi.getServerSpec) {
+						serverSpec = await serverManagerApi.getServerSpec(serverName) as serverManager.IServerSpec;
+						if (!serverSpec) {
+							return { server: serverName, namespace };
+						}
+						if (typeof serverSpec.password === 'undefined') {
+							const scopes = [serverSpec.name, serverSpec.username || ''];
+							let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
+							if (!session) {
+								session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
+							}
+							if (session) {
+								serverSpec.username = session.scopes[1];
+								serverSpec.password = session.accessToken;
+							}
+							else {
+								throw new Error('Cannot fetch credentials');
+							}
+						}
+
+						const runQuery = ((serverSpec: IServerSpec) => {
+							return makeRESTRequest(
+								'POST',
+								serverSpec,
+								{ apiVersion: 1, namespace, path: '/action/query' },
+								{ query: 'SELECT PolyglotKernel.CodeExecutor_HostName() AS Host, PolyglotKernel.CodeExecutor_SuperServerPort() AS Port', parameters: [] }
+							);
+						});
+						let response = await runQuery(serverSpec);
+						if (response !== undefined) {
+							if (response.data.result.content === undefined) {
+								if (response.data.status?.errors[0]?.code !== 5540) {
+									throw new Error(response.data.status.summary);
+								}
+								// Class is missing, so load and compile it, then re-run the query
+								const choice = await vscode.window.showInformationMessage(`Polyglot.CodeExecutor class not found in ${serverSpec.name}:${namespace}. Load it now?`, { modal: true }, { title: 'Yes' }, { title: 'No', isCloseAffordance: true });
+								if (choice?.title !== 'Yes') {
+									throw new Error('Polyglot.CodeExecutor class not available');
+								}
+								await loadAndCompile(serverSpec, namespace);
+								response = await runQuery(serverSpec);
+								if (response?.data.result.content === undefined) {
+									throw new Error(`Retry failed after class load: ${response?.data.status.summary ?? 'Unknown'}`);
+								}
+							}
+							const host = serverSpec.superServer?.host ?? response.data.result.content[0].Host;
+							const port = serverSpec.superServer?.port ?? response.data.result.content[0].Port;
+							serverSpec.superServer = { host, port };
+						}
+						await logoutREST(serverSpec);
+
+						return { server: serverName, namespace, serverSpec };
+					}
+					return { server: serverName, namespace };
+				}
+				return { server: '', namespace: ''};
+			});
+			const target = await resolveTarget();
+			if (target.serverSpec) {
+				if (!Server.get(serverNamespace)) {
+					new Server(target.serverSpec);
+				}
+				new ServerNamespaceMgr(serverNamespace, target);
+			}
+			return target;
 		});
-		const target = await resolveTarget();
-		if (target.serverSpec) {
-			if (!Server.get(serverNamespace)) {
-				new Server(target.serverSpec);
-			}
-			new ServerNamespaceMgr(serverNamespace, target);
-		}
-		return target;
 	}
 
 	static addRoutes(fastify: FastifyInstance) {
