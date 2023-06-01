@@ -92,6 +92,9 @@ export abstract class ApiBase {
 							serverSpec.username = session.scopes[1];
 							serverSpec.password = session.accessToken;
 						}
+						else {
+							throw new Error('Cannot fetch credentials');
+						}
 					}
 					const server = new Server(serverSpec);
 					Server.set(serverName, serverSpec);
@@ -176,9 +179,17 @@ export class MiscApi extends ApiBase {
 					},
 				};
 			};
-			const target = await ApiBase.getTarget(serverNamespace);
+			let target:ITarget;
+			try {
+				target = await ApiBase.getTarget(serverNamespace);
+			} catch (error) {
+				return noKernels(error as string);
+			}
 			if (!target?.serverSpec) {
-				return noKernels(`Unknown target '${request.params.serverNamespace}'`);
+				return noKernels(`Unknown target '${serverNamespace}'`);
+			}
+			if (!target.serverSpec.superServer?.port) {
+				return noKernels('Missing superserver port number');
 			}
 			let irisConn: IRISConnection;
 			let serverVersion: string;
