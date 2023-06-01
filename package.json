@@ -66,8 +66,12 @@
     "@fastify/websocket": "^7.1.1",
     "@nteract/messaging": "7.0.20",
     "uuid": "^9.0.0",
-    "json5": "^2.2.3"
-  },
+    "json5": "^2.2.3",
+    "axios": "^0.24.0",
+    "axios-cookiejar-support": "^1.0.1",
+    "tough-cookie": "^4.0.0",
+    "async-mutex": "^0.4.0"
+},
   "devDependencies": {
     "@intersystems-community/intersystems-servermanager": "latest",
     "@types/glob": "^8.0.0",
