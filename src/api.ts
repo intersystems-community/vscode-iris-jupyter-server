@@ -83,15 +83,15 @@ export abstract class ApiBase {
 						return { server: serverName, namespace };
 					}
 					if (typeof serverSpec.password === 'undefined') {
-					const scopes = [serverSpec.name, serverSpec.username || ''];
-					let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
-					if (!session) {
-						session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
-					}
-					if (session) {
-						serverSpec.username = session.scopes[1];
-						serverSpec.password = session.accessToken;
-					}
+						const scopes = [serverSpec.name, serverSpec.username || ''];
+						let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
+						if (!session) {
+							session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
+						}
+						if (session) {
+							serverSpec.username = session.scopes[1];
+							serverSpec.password = session.accessToken;
+						}
 					}
 					const server = new Server(serverSpec);
 					Server.set(serverName, serverSpec);
