@@ -1,21 +1,35 @@
-# iris-jupyter-server README
+# iris-jupyter-server
 
-This is the README for the `intersystems-community.iris-jupyter-server` VS Code extension.
+This VS Code extension is an alpha-quality proof-of-concept. Leveraging the [Jupyter extension from Microsoft](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter) it brings the notebook paradigm to developers working with InterSystems IRIS servers (local or remote).
 
-## Testing in a dev container
+## Getting started
 
-1. Clone this GitHub repo (intersystems-community/vscode-iris-jupyter-server).
-2. Open the local folder in VS Code. If prompted, install recommended extensions.
-3. When a notification appears, choose to `Reopen in Container`. If it doesn't appear, click the `><` panel at the left end of the status bar and choose `Reopen in Container` from the quickpick that appears.
-4. When "Starting Dev Container (show log)" notification appears, click on it to display progress.
-5. If notified "Configuration file(s) changed", click `Rebuild`".
-6. If notified "Git not found", click either `X` or `Don't Show Again` unless you intend using the dev container to make changes to the cloned repo.
-7. If notified about application on port 1972, click `X`.
-8. When the dev container has finished starting, the "Configuring Dev Container (show log)" notification will disappear.
-9. Use the Activity Bar to switch to "Run and Debug".
-10. Start debugging with the "Run Extension" configuration.
-11. The Extension Development Host (EDH) window opens after "Building..." has finished. If it notifies you "Configuration file(s) changed", click `Ignore`. If any notification about app ports appears, click `X` to dismiss it.
-12. In EDH's Explorer view, open the file `polyglot1.ipynb`
-13. If you get a notification about security in relation to connecting over HTTP without a token, click `Yes` or `Do not show again`.
-14. Click the `Select Kernel` button in the upper right of the notebook. Choose `Existing Jupyter server...`. If the next quickpick already contains an entry `Remote - localhost` then select it. Otherwise opt to enter a URL and enter `http://localhost:50773/devcontainer:user?token=` when prompted. On the next prompt ("Change Server Display Name") just press Enter.
-15. Click the `Run All` button. You should see an output cell appear underneath each of the three code cells.
+1. Install the [InterSystems ObjectScript Extension Pack](https://marketplace.visualstudio.com/items?itemName=intersystems-community.objectscript-pack).
+2. Use the [InterSystems Server Manager](https://marketplace.visualstudio.com/items?itemName=intersystems-community.servermanager) to define a connection to your IRIS server, which can be running locally on your workstation or remotely.
+3. From VS Code's `File` menu select `New File...`.
+4. From the quickpick choose `Jupyter Notebook`.
+5. If a notification from the Jupyter extension warns you that `Connecting over HTTP without a token may be an insecure connection`, choose `Yes` or `Do not show again`.
+6. Click the `Detecting Kernels` button in the upper right of the notebook.
+7. In the quickpick titled "Select Kernel" choose `Existing Jupyter Server...`.
+8. In the next quickpick ("Select a Jupyter Server") choose `Enter the URL of the running Jupyter server`.
+9. Enter `http://localhost:50773/`_servername_`:`_namespace_`?token=` when prompted. Replace _servername_ with the name of the Server Manager definition you previously created. Replace _namespace_ with the target namespace on that server. Do not omit the colon between these two elements.
+10. On the next prompt ("Change Server Display Name") optionally enter a suitable name, for example `IRIS231 USER`.
+11. When you connect to a namespace the first time you will be asked to allow the installation of a support class named `PolyglotKernel.CodeExecutor`. Choose `Yes`.
+12. On the kernel selector, choose the `IRIS ObjectScript INT` kernel.
+13. The kernel indicator in the upper right of the notebook will display your choice, and the initial notebook cell will show the corresponding language (ObjectScript INT) in the lower right corner.
+14. Starting with a single space indent, enter an ObjectScript command in the cell, e.g. ` write $zversion` and click the Execute Cell button on the left. The output from the command will appear below the cell.
+
+## Next steps
+
+- Create another .ipynb notebook, select the same Jupyter server, then pick the IRIS SQL kernel. Use cells to run SQL statements, for example `SELECT 123 AS One, 456 AS Two`.
+- In another notebook choose the IRIS Python kernel and run some Python code inside IRIS, for example `print('Hello world')`.
+- Try the Polyglot IRIS kernel. Begin each cell with a 'magic' line to indicate what language you are scripting in:
+	- %%objectscript
+	- %%python
+	- %%sql
+
+## Feedback
+
+Please open issues at https://github.com/intersystems-community/vscode-iris-jupyter-server/issues
+
+The [InterSystems Developer Community](https://community.intersystems.com/) is also a good place for discussing this extension.
