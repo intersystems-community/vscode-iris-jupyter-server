@@ -12,7 +12,7 @@ import { IServerSpec, Server } from './server';
 import { ServerNamespaceMgr } from './serverNamespaceMgr';
 import { JupyterServerAPI } from './jupyterServerAPI';
 import { logoutREST, makeRESTRequest } from './makeRESTRequest';
-import { extensionUri } from './extension';
+import { extensionUri, logChannel } from './extension';
 import { Mutex } from 'async-mutex';
 
 // Our interfaces
@@ -189,7 +189,8 @@ export class MiscApi extends ApiBase {
 
 		fastify.get('/:serverNamespace/hub/api', (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const { serverNamespace } = request.params;
-			reply.code(404); // Comment this out if we want to to convince Jupyter extension it is talking to a Jupyter Hub (implementation of more of hub API would be required)
+			reply.code(404); // Comment this out if we want to to convince Jupyter extension it is talking to a Jupyter Hub (implementation of more of hub API would be required
+			logChannel.debug(`/:serverNamespace/hub/api GET - reply code 404`);
 			return {};
 		});
 
@@ -296,7 +297,7 @@ export class MiscApi extends ApiBase {
 				default: dfltSpec,
 				kernelspecs: Object.fromEntries(specs)
 			};
-			console.log(`/:serverNamespace/api/kernelspecs GET - result: ${JSON.stringify(result)}`);
+			logChannel.debug(`/:serverNamespace/api/kernelspecs GET - result: ${JSON.stringify(result)}`);
 			return result;
 		});
 	}

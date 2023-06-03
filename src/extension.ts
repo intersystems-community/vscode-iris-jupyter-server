@@ -7,13 +7,13 @@ import { SessionsApi } from './api/sessions';
 //import { ContentsApi } from './api/contents';
 
 export let extensionUri: vscode.Uri;
+export let logChannel: vscode.LogOutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Extension "iris-jupyter-server" is activating');
 	extensionUri = context.extensionUri;
+	logChannel = vscode.window.createOutputChannel('IRIS Jupyter Server Proxy', { log: true});
+	logChannel.info('Extension activated');
 
 	const fastify = Fastify({
 		//logger: true
@@ -47,10 +47,13 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Run the server, listening only on loopback interface
 	const start = async () => {
+		const port = 50773;
 		try {
-			await fastify.listen({ port: 50773 });
+			await fastify.listen({ port });
+			logChannel.info(`Listening on port ${port}`);
 		} catch (err) {
 			fastify.log.error(err);
+			logChannel.error(err as Error);
 		}
 	};
 	start();

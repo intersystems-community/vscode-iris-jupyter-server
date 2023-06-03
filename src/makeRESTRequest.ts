@@ -7,6 +7,7 @@ import * as https from "https";
 import tough = require("tough-cookie");
 import * as vscode from "vscode";
 import { IServerSpec } from "@intersystems-community/intersystems-servermanager";
+import { logChannel } from "./extension";
 
 axiosCookieJarSupport(axios);
 
@@ -141,7 +142,7 @@ export async function makeRESTRequest(
 		}
 		return respdata;
 	} catch (error) {
-		console.log(error);
+		logChannel.error(error as Error);
 		return undefined;
 	}
 }
@@ -184,7 +185,7 @@ export async function logoutREST(server: IServerSpec) {
 			},
 		);
 	} catch (error) {
-		console.log(error);
+		logChannel.error(error as Error);
 	}
 	serverRESTSessions.delete(server.name);
 }

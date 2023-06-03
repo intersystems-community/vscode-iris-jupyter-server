@@ -1,5 +1,6 @@
 import { Disposable } from 'vscode';
 import { ITarget } from './api';
+import { logChannel } from './extension';
 const irisNative = require('../intersystems-iris-native');
 
 export class IRISConnection extends Disposable{
@@ -7,7 +8,7 @@ export class IRISConnection extends Disposable{
 	public iris: any;
 	constructor(target: ITarget) {
 		super(() => {
-			console.log(`IRISConnection disposed`);
+			logChannel.debug(`IRISConnection disposed`);
 			this.connection?.close();
 		});
 		const connectionInfo = {
@@ -29,9 +30,9 @@ export class IRISConnection extends Disposable{
 		if (this.iris) {
 			try {
 				const initObject = JSON.parse(this.iris.classMethodValue('PolyglotKernel.CodeExecutor', 'Init'));
-				console.log(`IRISConnection Init: ${JSON.stringify(initObject)}`);
+				logChannel.debug(`IRISConnection Init: ${JSON.stringify(initObject)}`);
 			} catch (error) {
-				console.log(`IRISConnection Init failed: ${error}`);
+				logChannel.debug(`IRISConnection Init failed: ${error}`);
 			}
 		}
 	}

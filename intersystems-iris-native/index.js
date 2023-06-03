@@ -13,7 +13,7 @@ if (process.platform == "win32" && process.arch == "x64") {
     native = require('./bin/macx64/irisnative.node');
 } else if (process.platform == "linux") {
     let distro = getLinuxDistro()
-    console.log('platform = ' + process.platform + ': ' + distro + ': ' + process.arch);
+    logChannel.debug('platform = ' + process.platform + ': ' + distro + ': ' + process.arch);
     if (distro == 'ubuntu') {
         if (process.arch == "x64") {
             native = require('./bin/lnxubuntux64/irisnative.node');

@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyRequest } from "fastify";
 import { ApiBase, IRequestGeneric } from "../api";
+import { logChannel } from "../extension";
 
 interface IRequestContents extends IRequestGeneric {
 	Params: {
@@ -18,7 +19,7 @@ export class ContentsApi extends ApiBase {
 		// Create a new file in the specified path
 		fastify.post('/:serverNamespace/api/contents', (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
-			console.log(`/:serverNamespace/api/contents POST request, body=${request.body}`);
+			logChannel.debug(`/:serverNamespace/api/contents POST request, body=${request.body}`);
 			const bodyObj = JSON.parse(request.body);
 			reply.code(201);
 			const datetimeNow = 'now'; //TODO
@@ -39,7 +40,7 @@ export class ContentsApi extends ApiBase {
 		fastify.patch('/:serverNamespace/api/contents/:path(.*)', (request: FastifyRequest<IRequestContents>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
 			const path = request.params.path;
-			console.log(`/:serverNamespace/api/contents PATCH request, body=${request.body}`);
+			logChannel.debug(`/:serverNamespace/api/contents PATCH request, body=${request.body}`);
 			const bodyObj = JSON.parse(request.body);
 			reply.code(200);
 			const datetimeNow = 'now'; //TODO
@@ -60,7 +61,7 @@ export class ContentsApi extends ApiBase {
 		fastify.delete('/:serverNamespace/api/contents/:path(.*)', (request: FastifyRequest<IRequestContents>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
 			const path = request.params.path;
-			console.log(`/:serverNamespace/api/contents DELETE request for ${path}`);
+			logChannel.debug(`/:serverNamespace/api/contents DELETE request for ${path}`);
 			reply.code(200);
 			return;
 		});

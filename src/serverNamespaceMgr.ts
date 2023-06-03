@@ -3,6 +3,7 @@ import { IProcess, ITarget } from "./api";
 import { JupyterServerAPI } from "./jupyterServerAPI";
 import { v4 as uuid } from 'uuid';
 import { IRISConnection } from "./iris";
+import { logChannel } from "./extension";
 
 var serverNamespaceMgrMap = new Map<string, ServerNamespaceMgr>();
 
@@ -47,7 +48,7 @@ export class ServerNamespaceMgr extends Disposable {
 	}
 
 	createSession(session: JupyterServerAPI.ISession, connection:IRISConnection): JupyterServerAPI.ISession {
-		console.log(`ServerNamespaceMgr: create '${session.type}' type session with name '${session.name}' for path '${session.path}' with a '${session.kernel.name}' kernel`);
+		logChannel.debug(`ServerNamespaceMgr: create '${session.type}' type session with name '${session.name}' for path '${session.path}' with a '${session.kernel.name}' kernel`);
 
 		session.id = uuid();
 		session.kernel.id = uuid();
@@ -60,7 +61,7 @@ export class ServerNamespaceMgr extends Disposable {
 	}
 
 	restartKernel(kernelId: string): string {
-		console.log(`ServerNamespaceMgr: restart kernel ${kernelId}`);
+		logChannel.debug(`ServerNamespaceMgr: restart kernel ${kernelId}`);
 
 		const process = this._augmentedKernelMap.get(kernelId);
 		if (!process) {

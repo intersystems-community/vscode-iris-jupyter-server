@@ -6,6 +6,7 @@ import { JupyterServerAPI } from "../jupyterServerAPI";
 import { ServerNamespaceMgr } from "../serverNamespaceMgr";
 import console = require("console");
 import json5 = require("json5");
+import { logChannel } from "../extension";
 
 interface IRequestKernel extends IRequestGeneric {
 	Params: {
@@ -27,7 +28,7 @@ export class KernelsApi extends ApiBase {
 		fastify.get('/:serverNamespace/api/kernels', (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
 			const result = ServerNamespaceMgr.get(serverNamespace)?.allKernels() || [];
-			//console.log(`/:serverNamespace/api/kernels GET - result: ${JSON.stringify(result)}`);
+			//logChannel.debug(`/:serverNamespace/api/kernels GET - result: ${JSON.stringify(result)}`);
 			return result;
 		});
 
@@ -86,7 +87,7 @@ export class KernelsApi extends ApiBase {
 		fastify.post('/:serverNamespace/api/kernels/:kernelId/interrupt', (request: FastifyRequest<IRequestKernel>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
 			const kernelId = request.params.kernelId;
-			console.log(`TODO - interrupt for kernelId '${kernelId}' on '${serverNamespace}'`);
+			logChannel.debug(`TODO - interrupt for kernelId '${kernelId}' on '${serverNamespace}'`);
 
 			const process = ServerNamespaceMgr.get(serverNamespace)?.getProcess(kernelId);
 			if (!process) {
@@ -109,7 +110,7 @@ export class KernelsApi extends ApiBase {
 		fastify.post('/:serverNamespace/api/kernels/:kernelId/restart', (request: FastifyRequest<IRequestKernel>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
 			const kernelId = request.params.kernelId;
-			console.log(`TODO - restart for kernelId '${kernelId}' on '${serverNamespace}'`);
+			logChannel.debug(`TODO - restart for kernelId '${kernelId}' on '${serverNamespace}'`);
 
 			const kernel = ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
 			if (!kernel) {
@@ -134,14 +135,14 @@ export class KernelsApi extends ApiBase {
 				const serverNamespace = request.params.serverNamespace;
 				const kernelId = request.params.kernelId;
 				const clientSessionId = request.query.session_id;
-				console.log(`WSget for kernelId '${kernelId}' channels on '${serverNamespace}'`);
+				logChannel.debug(`WSget for kernelId '${kernelId}' channels on '${serverNamespace}'`);
 
 				// Cutting a corner here. If we want to support kernel restart we will need to assign a dedicated uuid each time the process
 				// servicing kernelId restarts, because the kernelId won't change but the session property of the header object within its messages must change.
 				const kernelSessionId = kernelId;
 
 				connection.socket.on('message', (rawData) => {
-					console.log(`WS message arrived: ${rawData.toString('utf8')}`);
+					logChannel.debug(`WS message arrived: ${rawData.toString('utf8')}`);
 					let message: nteract.JupyterMessage = JSON.parse(rawData.toString('utf8'));
 
 					const sendStatus = (status: string) => {
@@ -149,7 +150,7 @@ export class KernelsApi extends ApiBase {
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
 						connection.socket.send(JSON.stringify(msg), () => {
-							console.log(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}, status ${status}: ${JSON.stringify(msg)}`);
+							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}, status ${status}: ${JSON.stringify(msg)}`);
 						});
 					};
 
@@ -189,7 +190,7 @@ export class KernelsApi extends ApiBase {
 							try {
 								fnProcess(output);
 							} catch (error: any) {
-								console.log(`Failed to parse output as JSON: ${error.message}`);
+								logChannel.debug(`Failed to parse output as JSON: ${error.message}`);
 							}
 						}
 						const msg = nteract.createMessage('execute_result', {
@@ -203,7 +204,7 @@ export class KernelsApi extends ApiBase {
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
 						connection.socket.send(JSON.stringify(msg), () => {
-							console.log(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
+							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
 						});
 					};
 
@@ -220,7 +221,7 @@ export class KernelsApi extends ApiBase {
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
 						connection.socket.send(JSON.stringify(msg), () => {
-							console.log(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
+							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
 						});
 					};
 
@@ -230,13 +231,13 @@ export class KernelsApi extends ApiBase {
 						msg.channel = 'iopub';
 						const outString = JSON.stringify(msg);
 						connection.socket.send(outString, () => {
-							console.log(` > kernel '${kernelId}' socket message was broadcast on IOPub: ${outString}`);
+							logChannel.debug(` > kernel '${kernelId}' socket message was broadcast on IOPub: ${outString}`);
 						});
 						msg.channel = originalChannel;
 					};
 					*/
 
-					console.log(` < kernel '${kernelId}' socket message received, channel ${message.channel}, type ${message.header.msg_type} message=${JSON.stringify(message)}`);
+					logChannel.debug(` < kernel '${kernelId}' socket message received, channel ${message.channel}, type ${message.header.msg_type} message=${JSON.stringify(message)}`);
 
 					sendStatus('busy');
 
@@ -331,7 +332,7 @@ export class KernelsApi extends ApiBase {
 									inputMsg.header.username = 'iris-jupyter-server';
 									inputMsg.parent_header = message.header;
 									connection.socket.send(JSON.stringify(inputMsg), () => {
-										console.log(` > kernel '${kernelId}' socket message sent, channel ${inputMsg.channel}, type ${inputMsg.header.msg_type}: ${JSON.stringify(inputMsg)}`);
+										logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${inputMsg.channel}, type ${inputMsg.header.msg_type}: ${JSON.stringify(inputMsg)}`);
 									});
 								}
 								*/
@@ -406,7 +407,7 @@ export class KernelsApi extends ApiBase {
 						reply.header.session = kernelSessionId;
 						reply.header.username = 'iris-jupyter-server';
 						connection.socket.send(JSON.stringify(reply), () => {
-							console.log(` > Sent reply: ${JSON.stringify(reply)}`);
+							logChannel.debug(` > Sent reply: ${JSON.stringify(reply)}`);
 							sendStatus('idle');
 						});
 					}
