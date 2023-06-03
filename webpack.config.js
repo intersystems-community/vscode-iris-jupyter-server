@@ -21,7 +21,6 @@ const extensionConfig = {
     libraryTarget: 'commonjs2'
   },
   externals: {
-		json5: 'commonjs json5', // Version 2.2.3 didn't work when webpacked
     vscode: 'commonjs vscode' // the vscode-module is created on-the-fly and must be excluded. Add other modules that cannot be webpack'ed, 📖 -> https://webpack.js.org/configuration/externals/
     // modules added here also need to be added in the .vscodeignore file
   },
@@ -41,7 +40,8 @@ const extensionConfig = {
         ]
       },
 			{
-				test: /\.node$/,
+				// Special handling for the irisnative.node file that we can't get get from npm
+				test: /irisnative\.node$/,
 				loader: 'node-loader',
 			}
     ]

@@ -8,6 +8,7 @@ intersystems-iris-native/index.js
 intersystems-iris-native/package.json
 intersystems-iris-native/**/*.node
 irisapp/**
+node_modules/**
 src/**
 test/**
 test/.conda/**
