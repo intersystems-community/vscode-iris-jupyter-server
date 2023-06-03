@@ -2,12 +2,11 @@
 
 **
 !dist/*.dll
+!dist/*.dylib
+!dist/*.so
 !dist/*.js
 !dist/*.node
 !dist/*.txt
-!intersystems-iris-native/**/*.dll
-!intersystems-iris-native/**/*.dylib
-!intersystems-iris-native/**/*.so
 !images/
 !CHANGELOG.md
 !LICENSE
