@@ -1,5 +1,2 @@
-# Change Log
-
-## [Unreleased]
-
-- Initial release
+## 0.0.4 (04-Jun-2023)
+- Initial release.

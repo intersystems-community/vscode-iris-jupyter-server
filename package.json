@@ -2,7 +2,7 @@
   "name": "iris-jupyter-server",
   "displayName": "Jupyter Server Proxy for InterSystems IRIS",
   "description": "Run a local Jupyter Server acting as a proxy for InterSystems IRIS servers defined in InterSystems Server Manager",
-  "version": "0.0.4-SNAPSHOT",
+  "version": "0.0.4",
   "preview": true,
   "publisher": "intersystems-community",
   "icon": "images/logo.png",
@@ -30,7 +30,10 @@
     "Other"
   ],
   "private": true,
-  "extensionDependencies": ["ms-toolsai.jupyter"],
+  "extensionDependencies": [
+    "ms-toolsai.jupyter",
+    "intersystems-community.objectscript-pack"
+  ],
   "activationEvents": [
     "onNotebook:jupyter-notebook",
     "onCommand:jupyter.selectjupyteruri",
