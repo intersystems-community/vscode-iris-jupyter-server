@@ -64,6 +64,7 @@
     "package-prep": "node -e \"require('fs').rmSync('./dist/', { recursive: true, force: true })",
     "package:win32-x64": "npm run package-prep && node -e \"require('fs').cpSync('./intersystems-iris-native/bin/winx64/', './dist/', { recursive: true, filter: (f) => !f.endsWith('irisnative.node') })\" && vsce package --target win32-x64",
     "package:darwin-x64": "npm run package-prep && node -e \"require('fs').cpSync('./intersystems-iris-native/bin/macx64/', './dist/', { recursive: true, filter: (f) => !f.endsWith('irisnative.node') })\" && vsce package --target darwin-x64",
+    "package:darwin-arm64": "npm run package-prep && node -e \"require('fs').cpSync('./intersystems-iris-native/bin/macos/', './dist/', { recursive: true, filter: (f) => !f.endsWith('irisnative.node') })\" && vsce package --target darwin-arm64",
     "package:linux-x64": "npm run package-prep && node -e \"require('fs').cpSync('./intersystems-iris-native/bin/lnxubuntux64/', './dist/', { recursive: true, filter: (f) => !f.endsWith('irisnative.node') })\" && vsce package --target linux-x64"
   },
   "dependencies": {

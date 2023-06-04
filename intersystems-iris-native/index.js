@@ -10,7 +10,11 @@ if (process.platform == "win32" && process.arch == "x64") {
 	native = require('./bin/winx86/irisnative.node');
 */
 } else if (process.platform == "darwin") {
-    native = require('./bin/macx64/irisnative.node');
+	if (process.arch == 'x64') {
+		native = require('./bin/macx64/irisnative.node');
+	} else {
+		native = require('./bin/macos/irisnative.node');
+	}
 } else if (process.platform == "linux") {
     let distro = getLinuxDistro()
     logChannel.debug('platform = ' + process.platform + ': ' + distro + ': ' + process.arch);
