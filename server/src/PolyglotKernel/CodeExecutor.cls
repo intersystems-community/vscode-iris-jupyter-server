@@ -26,7 +26,7 @@ ClassMethod Init(clientJSON As %String) As %String
 	kill
 
 	// Report versions
-	return {"apiVersion":("1.0"), "serverVersion":($zversion)}.%ToJSON()
+	return {"apiVersion":("1.1"), "serverVersion":($zversion), "$system":($system), "$job":($job), "$username":($username)}.%ToJSON()
 }
 
 ClassMethod CodeResult(zzPKCE1 As %String, zzPKCE2 As %String = "python") As %String [ ProcedureBlock = 0 ]

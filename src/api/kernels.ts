@@ -135,6 +135,9 @@ export class KernelsApi extends ApiBase {
 				const serverNamespace = request.params.serverNamespace;
 				const kernelId = request.params.kernelId;
 				const clientSessionId = request.query.session_id;
+
+				const process = ServerNamespaceMgr.get(serverNamespace)?.getProcess(kernelId);
+				const irisConn = process?.connection;
 				logChannel.debug(`WSget for kernelId '${kernelId}' channels on '${serverNamespace}'`);
 
 				// Cutting a corner here. If we want to support kernel restart we will need to assign a dedicated uuid each time the process
@@ -258,16 +261,13 @@ export class KernelsApi extends ApiBase {
 											name: 'iris-polyglot',
 											version: '0.0.1'
 										},
-										banner: '(a fake kernel banner)',
+										banner: `Job ${irisConn?.initObject?.['$job']} at ${serverNamespace}`,
 										help_links: []
 									}
 								});
 								break;
 
 							case 'execute_request':
-
-								const process = ServerNamespaceMgr.get(serverNamespace)?.getProcess(kernelId);
-								const irisConn = process?.connection;
 								if (!irisConn) {
 									sendError('No connection');
 									reply = nteract.createMessage('execute_reply', {

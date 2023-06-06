@@ -1,0 +1,57 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../gjsjohnmurray/vscode-jupyter"
+		}
+	],
+	"settings": {
+		"typescript.tsc.autoDetect": "off"
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Ours",
+				"type": "extensionHost",
+				"request": "launch",
+				"args": [
+					"${workspaceFolder:vscode-iris-jupyter-server}/test/test-iris-jupyter-server.code-workspace",
+					"--extensionDevelopmentPath=${workspaceFolder:vscode-iris-jupyter-server}"
+				],
+				"outFiles": [
+					"${workspaceFolder:vscode-iris-jupyter-server}/dist/**/*.js"
+				],
+				"preLaunchTask": "${defaultBuildTask:vscode-iris-jupyter-server}"
+			},
+			{
+				"name": "Theirs",
+				"type": "extensionHost",
+				"request": "launch",
+				"runtimeExecutable": "${execPath}",
+				"args": ["--extensionDevelopmentPath=${workspaceFolder:vscode-jupyter}", "--enable-proposed-api"],
+				"stopOnEntry": false,
+				"smartStep": true,
+				"sourceMaps": true,
+				"outFiles": ["${workspaceFolder:vscode-jupyter}/out/**/*", "!${workspaceFolder:vscode-jupyter}/**/node_modules**/*"],
+				"preLaunchTask": "Compile",
+				"skipFiles": ["<node_internals>/**"],
+				"env": {
+					// Disable this to turoff on redux & console logging during debugging
+					"VSC_JUPYTER_FORCE_LOGGING": "1",
+					// Enable this to try out new experiments locally
+					"VSC_JUPYTER_LOAD_EXPERIMENTS_FROM_FILE": "1",
+					// Enable this to log telemetry to the output during debugging
+					"XVSC_JUPYTER_LOG_TELEMETRY": "1",
+					// Enable this to log IPYWIDGET messages
+					"XVSC_JUPYTER_LOG_IPYWIDGETS": "1",
+					// Enable this to log debugger output. Directory must exist ahead of time
+					"XDEBUGPY_LOG_DIR": "${workspaceRoot:vscode-jupyter}/tmp/Debug_Output_Ex"
+				}
+			},
+
+		]
+	}
+}
