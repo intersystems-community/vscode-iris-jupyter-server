@@ -2,7 +2,7 @@
   "name": "iris-jupyter-server",
   "displayName": "Jupyter Server Proxy for InterSystems IRIS",
   "description": "Run a local Jupyter Server acting as a proxy for InterSystems IRIS servers defined in InterSystems Server Manager",
-  "version": "0.0.5",
+  "version": "0.0.6-SNAPSHOT",
   "preview": true,
   "publisher": "intersystems-community",
   "icon": "images/logo.png",
