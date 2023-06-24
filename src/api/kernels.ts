@@ -7,6 +7,9 @@ import { ServerNamespaceMgr } from "../serverNamespaceMgr";
 import console = require("console");
 import json5 = require("json5");
 import { logChannel } from "../extension";
+import { IRISConnection } from "../iris";
+import { v4 as uuid } from 'uuid';
+
 
 interface IRequestKernel extends IRequestGeneric {
 	Params: {
@@ -70,21 +73,14 @@ export class KernelsApi extends ApiBase {
 			// TODO
 			const serverNamespace = request.params.serverNamespace;
 			const kernelId = request.params.kernelId;
-			const kernel = ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
-			if (!kernel) {
-				reply.code(404);
-				return;
-			}
+			logChannel.debug(`DELETE for kernelId '${kernelId}' on '${serverNamespace}'`);
 
-			//TODO Delete
-			reply.code(404);
-			return;
-
+			ServerNamespaceMgr.get(serverNamespace)?.deleteKernel(kernelId);
 			reply.code(204);
-			return kernel;
+			return;
 		});
 
-		fastify.post('/:serverNamespace/api/kernels/:kernelId/interrupt', (request: FastifyRequest<IRequestKernel>, reply) => {
+		fastify.post('/:serverNamespace/api/kernels/:kernelId/interrupt', async (request: FastifyRequest<IRequestKernel>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
 			const kernelId = request.params.kernelId;
 			logChannel.debug(`TODO - interrupt for kernelId '${kernelId}' on '${serverNamespace}'`);
@@ -95,19 +91,16 @@ export class KernelsApi extends ApiBase {
 				return;
 			}
 
-			//TODO - Blocked by Node.js Native API not being async
-			const jobNumber = process.connection.iris.classMethodValue('%SYSTEM.SYS', 'ProcessID');
-			const result = process.connection.iris.classMethodValue('%SYSTEM.Process', 'Terminate', jobNumber);
-			if (result === 1) {
-				reply.code(204);
-			}
-			else {
-				reply.code(404);
-			}
-			return;
+			//TOD Is it possible to interrupt another running process?
+			const jobNumber = process.connection.initObject['$job'];
+			reply.code(501);
+			return {
+				"message": `No way to interrupt job ${jobNumber}`,
+				"short_message": 'CannotInterrupt'
+			};
 		});
 
-		fastify.post('/:serverNamespace/api/kernels/:kernelId/restart', (request: FastifyRequest<IRequestKernel>, reply) => {
+		fastify.post('/:serverNamespace/api/kernels/:kernelId/restart', async (request: FastifyRequest<IRequestKernel>, reply) => {
 			const serverNamespace = request.params.serverNamespace;
 			const kernelId = request.params.kernelId;
 			logChannel.debug(`TODO - restart for kernelId '${kernelId}' on '${serverNamespace}'`);
@@ -118,13 +111,14 @@ export class KernelsApi extends ApiBase {
 				return;
 			}
 
-			const newKernelId = ServerNamespaceMgr.get(serverNamespace)?.restartKernel(kernelId);
+			const newKernelId = await ServerNamespaceMgr.get(serverNamespace)?.restartKernel(kernelId);
 			if (!newKernelId) {
 				reply.code(404);
 				return;
 			}
 			reply.code(200);
-			return ServerNamespaceMgr.get(serverNamespace)?.getKernel(newKernelId);
+			const newKernel = ServerNamespaceMgr.get(serverNamespace)?.getKernel(newKernelId);
+			return newKernel;
 		});
 
 		// Websocket handler for /api/kernels/:kernelId/channels
@@ -136,16 +130,31 @@ export class KernelsApi extends ApiBase {
 				const kernelId = request.params.kernelId;
 				const clientSessionId = request.query.session_id;
 
-				const process = ServerNamespaceMgr.get(serverNamespace)?.getProcess(kernelId);
+				const serverNamespaceMgr = ServerNamespaceMgr.get(serverNamespace);
+				const process = serverNamespaceMgr?.getProcess(kernelId);
 				const irisConn = process?.connection;
 				logChannel.debug(`WSget for kernelId '${kernelId}' channels on '${serverNamespace}'`);
 
 				// Cutting a corner here. If we want to support kernel restart we will need to assign a dedicated uuid each time the process
-				// servicing kernelId restarts, because the kernelId won't change but the session property of the header object within its messages must change.
-				const kernelSessionId = kernelId;
+				// servicing kernelId restarts, because the kernelId won't change but the session property of the header object within its messages MUST change.
+				///const kernelSessionId = kernelId;
+				const kernelSessionId = uuid();
+
+				connection.socket.on('error', (error) => {
+					logChannel.error(error);
+				});
+
+				connection.socket.on('close', (code, reason) => {
+					const sessionName = process?.sessionName;
+					logChannel.debug(`WS close: ${code} ${reason.toString('utf8')} - kernelId: ${kernelId} sessionName: ${sessionName}`);
+					if (serverNamespaceMgr && sessionName) {
+						serverNamespaceMgr.deleteSession(sessionName);
+					}
+					irisConn?.dispose();
+				});
 
 				connection.socket.on('message', (rawData) => {
-					logChannel.debug(`WS message arrived: ${rawData.toString('utf8')}`);
+					logChannel.trace(`WS message arrived: ${rawData.toString('utf8')}`);
 					let message: nteract.JupyterMessage = JSON.parse(rawData.toString('utf8'));
 
 					const sendStatus = (status: string) => {
@@ -153,7 +162,8 @@ export class KernelsApi extends ApiBase {
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
 						connection.socket.send(JSON.stringify(msg), () => {
-							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}, status ${status}: ${JSON.stringify(msg)}`);
+							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}, status ${status}`);
+							logChannel.trace(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}, status ${status}: ${JSON.stringify(msg)}`);
 						});
 					};
 
@@ -207,7 +217,8 @@ export class KernelsApi extends ApiBase {
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
 						connection.socket.send(JSON.stringify(msg), () => {
-							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
+							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: content=${JSON.stringify(msg.content)}`);
+							logChannel.trace(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
 						});
 					};
 
@@ -224,7 +235,8 @@ export class KernelsApi extends ApiBase {
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
 						connection.socket.send(JSON.stringify(msg), () => {
-							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
+							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: content=${JSON.stringify(msg.content)}`);
+							logChannel.trace(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
 						});
 					};
 
@@ -240,7 +252,13 @@ export class KernelsApi extends ApiBase {
 					};
 					*/
 
-					logChannel.debug(` < kernel '${kernelId}' socket message received, channel ${message.channel}, type ${message.header.msg_type} message=${JSON.stringify(message)}`);
+					const type = message.header.msg_type;
+					const detail =
+						type === 'execute_request'
+							? ` code: ${message.content.code}`
+							: '';
+					logChannel.debug(` < kernel '${kernelId}' socket message received, channel ${message.channel}, type ${message.header.msg_type}${detail ? ' detail=' + detail : ''}`);
+					logChannel.trace(` < kernel '${kernelId}' socket message received, channel ${message.channel}, type ${message.header.msg_type} message=${JSON.stringify(message)}`);
 
 					sendStatus('busy');
 
@@ -407,7 +425,8 @@ export class KernelsApi extends ApiBase {
 						reply.header.session = kernelSessionId;
 						reply.header.username = 'iris-jupyter-server';
 						connection.socket.send(JSON.stringify(reply), () => {
-							logChannel.debug(` > Sent reply: ${JSON.stringify(reply)}`);
+							logChannel.debug(` > Sent reply: content=${JSON.stringify(reply.content)}`);
+							logChannel.trace(` > Sent reply: ${JSON.stringify(reply)}`);
 							sendStatus('idle');
 						});
 					}

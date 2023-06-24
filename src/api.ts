@@ -297,7 +297,11 @@ export class MiscApi extends ApiBase {
 				default: dfltSpec,
 				kernelspecs: Object.fromEntries(specs)
 			};
-			logChannel.debug(`/:serverNamespace/api/kernelspecs GET - result: ${JSON.stringify(result)}`);
+
+			// Occurs every 60 seconds while idling, probably whenever Jupyter extension refreshes a cache.
+			// Multiple occurrences (2 or 3 ?) of this a 60000ms recurrence have been observed.
+			//logChannel.debug(`/:serverNamespace/api/kernelspecs GET`);
+			logChannel.trace(`/:serverNamespace/api/kernelspecs GET - result: ${JSON.stringify(result)}`);
 			return result;
 		});
 	}

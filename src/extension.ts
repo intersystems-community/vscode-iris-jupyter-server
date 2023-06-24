@@ -25,14 +25,17 @@ export function activate(context: vscode.ExtensionContext) {
 	// Routes
 	fastify.register(async (fastify) => {
 
-		// Add this so fastify won't reject the empty-body POST that the Jupyter extension makes to /:serverNamespace/api/kernels/:kernelId/interrupt when
-		// user requests interrupt of a running cell
+		// Add this so fastify won't reject the empty-body POST that the Jupyter extension makes
+		// to /:serverNamespace/api/kernels/:kernelId/interrupt and .../restart when
+		// user requests interrupt / restart of a running kernel
 		fastify.addContentTypeParser<string>('application/json', { parseAs: 'string' }, function (req, body, done) {
 			try {
 				if (body === '') {
 					done(null, {});
 				}
-				done(null, JSON.parse(body));
+				else {
+					done(null, JSON.parse(body));
+				}
 			} catch (err: any) {
 				err.statusCode = 400;
 				done(err, undefined);

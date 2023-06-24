@@ -9,7 +9,7 @@ export class IRISConnection extends Disposable{
 	public initObject: any;
 	constructor(target: ITarget) {
 		super(() => {
-			logChannel.debug(`IRISConnection disposed`);
+			logChannel.trace(`IRISConnection disposed`);
 			this.connection?.close();
 		});
 		const connectionInfo = {
@@ -31,9 +31,9 @@ export class IRISConnection extends Disposable{
 		if (this.iris) {
 			try {
 				this.initObject = JSON.parse(this.iris.classMethodValue('PolyglotKernel.CodeExecutor', 'Init'));
-				logChannel.debug(`IRISConnection Init: ${JSON.stringify(this.initObject)}`);
+				logChannel.trace(`IRISConnection Init: ${JSON.stringify(this.initObject)}`);
 			} catch (error) {
-				logChannel.debug(`IRISConnection Init failed: ${error}`);
+				logChannel.trace(`IRISConnection Init failed: ${error}`);
 			}
 		}
 	}

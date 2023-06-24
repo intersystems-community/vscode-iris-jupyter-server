@@ -1,5 +1,5 @@
 import { Disposable } from "vscode";
-import { IProcess, ITarget } from "./api";
+import { ApiBase, IProcess, ITarget } from "./api";
 import { JupyterServerAPI } from "./jupyterServerAPI";
 import { v4 as uuid } from 'uuid';
 import { IRISConnection } from "./iris";
@@ -60,17 +60,43 @@ export class ServerNamespaceMgr extends Disposable {
 		return session;
 	}
 
-	restartKernel(kernelId: string): string {
+	deleteSession(sessionName: string): void {
+		const kernelId = this._sessionMap.get(sessionName)?.kernel.id;
+		this._sessionMap.delete(sessionName);
+		if (kernelId) {
+			this._augmentedKernelMap.delete(kernelId);
+		}
+	}
+
+	deleteKernel(kernelId: string): void {
+		this._augmentedKernelMap.delete(kernelId);
+	}
+
+	async restartKernel(kernelId: string): Promise<string> {
 		logChannel.debug(`ServerNamespaceMgr: restart kernel ${kernelId}`);
 
 		const process = this._augmentedKernelMap.get(kernelId);
 		if (!process) {
 			return '';
 		}
-
+		const jobNumber = process.connection.initObject['$job'];
 		process.connection.dispose();
-		process.connection = new IRISConnection(this.target);
+		try {
+			const irisConn = new IRISConnection(this.target);
+			const result = irisConn.iris.classMethodValue('%SYSTEM.Process', 'Terminate', jobNumber);
+			irisConn.dispose();
+			if (result !== 1) {
+				logChannel.debug(`Kernel restart got ${result} when terminating old process ${jobNumber}`);
+				return '';
+			}
+		} catch (error) {
+			const e = error as Error;
+			logChannel.error(`Kernel restart failed to terminate old process ${jobNumber}`);
+			logChannel.error(e);
+			return '';
+		}
 
+		process.connection = new IRISConnection(this.target);
 		const sessionName = process.sessionName;
 		if (!sessionName) {
 			return '';
@@ -80,11 +106,15 @@ export class ServerNamespaceMgr extends Disposable {
 		if (!session) {
 			return '';
 		}
-		session.kernel.connections = 1;
-		session.kernel.execution_state = 'idle';
-		process.executionCount = 0;
 
-		return kernelId;
+		//this.deleteSession(sessionName);
+		this._sessionMap.delete(sessionName);
+		return this.createSession(session, process.connection).kernel?.id || '';
+
+		//session.kernel.connections = 1;
+		//session.kernel.execution_state = 'idle';
+		//process.executionCount = 0;
+		//return kernelId;
 	}
 
 	constructor(serverNamespace: string, target: ITarget) {
