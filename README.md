@@ -49,9 +49,8 @@ The [Jupyter PowerToys](https://marketplace.visualstudio.com/items?itemName=ms-t
 
 ## Known Issues
 
-1. The extension is not yet available for Apple Macs containing the M1 or M2 processors.
-2. The InterSystems IRIS Node Native API connectivity we use operates only in synchronous mode. Consequently the output from a long-running cell does not stream, so you have to wait for all the work to complete before you see any results for the cell.
-3. THe Jupyter Server proxy launched by the extension always listens on port 50773.
+1. The InterSystems IRIS Node Native API connectivity we use operates only in synchronous mode. Consequently the output from a long-running cell does not stream, so you have to wait for all the work to complete before you see any results for the cell.
+2. The Jupyter Server proxy launched by the extension always listens on port 50773.
 
 ## Feedback
 
