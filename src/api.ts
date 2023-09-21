@@ -61,7 +61,7 @@ export abstract class ApiBase {
 			const loadAndCompile = (async (serverSpec: IServerSpec, namespace: string): Promise<void> => {
 				const fileUri = vscode.Uri.joinPath(extensionUri, 'server/src/PolyglotKernel/CodeExecutor.cls');
 				const name = 'PolyglotKernel.CodeExecutor.cls';
-				const content = (await vscode.workspace.fs.readFile(fileUri)).toString().split('\n');
+				const content = (await vscode.workspace.fs.readFile(fileUri)).toString().split('\n').map((line) => line.replace('\r', ''));
 				//const name = 'YJMpushed.int';
 				//const content: string[] = ['ROUTINE YJMpushed [Type=INT]', 'YJMpushed ;stub', ' write "Hello"', ' quit'];
 				let response = await makeRESTRequest(
