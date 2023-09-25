@@ -87,13 +87,63 @@ export abstract class ApiBase {
 
 			const resolveTarget = (async (): Promise<ITarget> => {
 				const parts = serverNamespace.split(':');
-				const namespace = parts[1].toUpperCase();
-				if (parts.length === 2) {
-					const serverName = parts[0].toLowerCase();
-					let serverSpec = Server.get(serverName);
-					if (serverSpec) {
-						return { server: serverName, namespace, serverSpec };
+				if (parts.length !== 2) {
+					return { server: '', namespace: ''};
+				}
+
+				let serverName = parts[0].toLowerCase();
+				let namespace = parts[1].toUpperCase();
+				let serverSpec = Server.get(serverName);
+				if (serverSpec) {
+					return { server: serverName, namespace, serverSpec };
+				}
+				if (serverName === '') {
+
+					const getObjectScriptAPI = (async(): Promise<any> => {
+						const targetExtension = vscode.extensions.getExtension("intersystems-community.vscode-objectscript");
+						if (!targetExtension) {
+						  return undefined;
+						}
+						if (!targetExtension.isActive) {
+						  await targetExtension.activate();
+						}
+						const api = targetExtension.exports;
+					
+						if (!api) {
+						  return undefined;
+						}
+						return api;
+					});
+					const osAPI = await getObjectScriptAPI();
+					if (!osAPI) {
+						throw new Error('Missing intersystems-community.vscode-objectscript API');
 					}
+					const osServer = osAPI.serverForUri();
+					if (!osServer) {
+						throw new Error('Missing objectscript.conn');
+					}
+					if (!osServer.active) {
+						throw new Error('Disabled objectscript.conn');
+					}
+					serverSpec = {
+						username: osServer.username,
+						password: osServer.password,
+						name: osServer.serverName,
+						webServer: {
+						  host: osServer.host,
+						  port: osServer.port,
+						  pathPrefix: osServer.pathPrefix,
+						  scheme: osServer.scheme
+						}
+					};
+					if (namespace === '') {
+						namespace = osServer.namespace;
+					}
+					if (osServer.serverName) {
+						serverName = osServer.serverName;
+					}
+				}
+				if (!serverSpec) {
 					if (typeof serverManagerApi === 'undefined') {
 						let extension;
 						extension = vscode.extensions.getExtension(serverManager.EXTENSION_ID);
@@ -106,66 +156,68 @@ export abstract class ApiBase {
 							return { server: '', namespace: ''};
 						}
 						if (!extension.isActive) {
-						await extension.activate();
+							await extension.activate();
 						}
 						serverManagerApi = extension.exports;
 					}
-					if (serverManagerApi && serverManagerApi.getServerSpec) {
-						serverSpec = await serverManagerApi.getServerSpec(serverName) as serverManager.IServerSpec;
-						if (!serverSpec) {
-							return { server: serverName, namespace };
-						}
-						if (typeof serverSpec.password === 'undefined') {
-							const scopes = [serverSpec.name, serverSpec.username || ''];
-							let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
-							if (!session) {
-								session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
-							}
-							if (session) {
-								serverSpec.username = session.scopes[1];
-								serverSpec.password = session.accessToken;
-							}
-							else {
-								throw new Error('Cannot fetch credentials');
-							}
-						}
-
-						const runQuery = ((serverSpec: IServerSpec) => {
-							return makeRESTRequest(
-								'POST',
-								serverSpec,
-								{ apiVersion: 1, namespace, path: '/action/query' },
-								{ query: 'SELECT PolyglotKernel.CodeExecutor_HostName() AS Host, PolyglotKernel.CodeExecutor_SuperServerPort() AS Port', parameters: [] }
-							);
-						});
-						let response = await runQuery(serverSpec);
-						if (response !== undefined) {
-							if (response.data.result.content === undefined) {
-								if (response.data.status?.errors[0]?.code !== 5540) {
-									throw new Error(response.data.status.summary);
-								}
-								// Class is missing, so load and compile it, then re-run the query
-								const choice = await vscode.window.showInformationMessage(`Polyglot.CodeExecutor class not found in ${serverSpec.name}:${namespace}. Load it now?`, { modal: true }, { title: 'Yes' }, { title: 'No', isCloseAffordance: true });
-								if (choice?.title !== 'Yes') {
-									throw new Error('Polyglot.CodeExecutor class not available');
-								}
-								await loadAndCompile(serverSpec, namespace);
-								response = await runQuery(serverSpec);
-								if (response?.data.result.content === undefined) {
-									throw new Error(`Retry failed after class load: ${response?.data.status.summary ?? 'Unknown'}`);
-								}
-							}
-							const host = serverSpec.superServer?.host ?? response.data.result.content[0].Host;
-							const port = serverSpec.superServer?.port ?? response.data.result.content[0].Port;
-							serverSpec.superServer = { host, port };
-						}
-						await logoutREST(serverSpec);
-
-						return { server: serverName, namespace, serverSpec };
+					serverSpec = await serverManagerApi.getServerSpec(serverName) as serverManager.IServerSpec;
+					if (!serverSpec) {
+						return { server: serverName, namespace };
 					}
-					return { server: serverName, namespace };
+					if (typeof serverSpec.password === 'undefined') {
+						const scopes = [serverSpec.name, serverSpec.username || ''];
+						let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
+						if (!session) {
+							session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
+						}
+						if (session) {
+							serverSpec.username = session.scopes[1];
+							serverSpec.password = session.accessToken;
+						}
+						else {
+							throw new Error(`Cannot fetch credentials for server '${serverName}'`);
+						}
+					}
 				}
-				return { server: '', namespace: ''};
+
+				// Check existence of server-side support class, and install it if absent
+				const runQuery = ((serverSpec: IServerSpec) => {
+					return makeRESTRequest(
+						'POST',
+						serverSpec,
+						{ apiVersion: 1, namespace, path: '/action/query' },
+						{ query: 'SELECT PolyglotKernel.CodeExecutor_HostName() AS Host, PolyglotKernel.CodeExecutor_SuperServerPort() AS Port', parameters: [] }
+					);
+				});
+				try {
+					let response = await runQuery(serverSpec);
+					if (response !== undefined) {
+						if (response.data.result.content === undefined) {
+							if (response.data.status?.errors[0]?.code !== 5540) {
+								throw new Error(response.data.status.summary);
+							}
+							// Class is missing, so load and compile it, then re-run the query
+							const choice = await vscode.window.showInformationMessage(`Polyglot.CodeExecutor class not found in ${serverSpec.name}:${namespace}. Load it now?`, { modal: true }, { title: 'Yes' }, { title: 'No', isCloseAffordance: true });
+							if (choice?.title !== 'Yes') {
+								throw new Error('Polyglot.CodeExecutor class not available');
+							}
+							await loadAndCompile(serverSpec, namespace);
+							response = await runQuery(serverSpec);
+							if (response?.data.result.content === undefined) {
+								throw new Error(`Retry failed after class load: ${response?.data.status.summary ?? 'Unknown'}`);
+							}
+						}
+						const host = serverSpec.superServer?.host ?? response.data.result.content[0].Host;
+						const port = serverSpec.superServer?.port ?? response.data.result.content[0].Port;
+						serverSpec.superServer = { host, port };
+					}
+				} catch (error) {
+					throw error;
+				} finally {
+					await logoutREST(serverSpec);
+				}
+
+				return { server: serverName, namespace, serverSpec };
 			});
 			const target = await resolveTarget();
 			if (target.serverSpec) {
