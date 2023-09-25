@@ -6,6 +6,7 @@ This VS Code extension is an alpha-quality proof of concept. It leverages [Micro
 
 1. Install the extension. This will also install the Jupyter and ObjectScript extension packs if you don't already have them.
 2. Use [InterSystems Server Manager](https://marketplace.visualstudio.com/items?itemName=intersystems-community.servermanager) to define a connection to an IRIS server.
+> **Note:** IRIS developers who already use the `objectscript.conn` settings object and don't want to adopt Server Manager should consult a later section of this document for information applicable to them.
 3. From VS Code's `File` menu select `New File...`. This option is also available on the Welcome page.
 4. When a quickpick appears, choose `Jupyter Notebook`.
 5. Click the `Detecting Kernels` button in the upper right of the notebook.
@@ -18,7 +19,7 @@ This VS Code extension is an alpha-quality proof of concept. It leverages [Micro
 11. On the kernel selector, choose the `IRIS ObjectScript INT` kernel.
 12. The kernel indicator in the upper right of the notebook will display your choice, and the initial notebook cell will show the corresponding language (ObjectScript INT) in the lower right corner.
 13. Starting with a single-space indent, enter an ObjectScript command in the cell, e.g. `write $zversion,!,$namespace,!,$job,!` and click the Execute Cell button on the left. The output from the command will appear below the cell.
-> **Note:** If you forget to start the line with a space it won't be syntax-colored correctly but it will still execute.
+> **Tip:** If you forget to start the line with a space it won't be syntax-colored correctly but it will still execute.
 14. Cells can contain more than one line of code, so the above example could be rewritten as:
 ```objectscript
  write $zversion,!
@@ -42,6 +43,21 @@ print('Hello world')
 	- `%%sql`
 	
 > **Note:** Cells of a Polyglot IRIS notebook are not language-aware, so they lack syntax coloring, completions etc. The so-called 'cell magics' tell the server-side code executor class which language to run, but the Jupyter notebook extension is not currently able to use them to vary the cell language in the editor.
+
+## Use With `objectscript.conn`
+
+If you already use the `objectscript.conn` settings object to connect VS Code to your IRIS server, you can reference that connection definition in your Jupyter Server URL.
+
+- Enter `http://localhost:50773/:?token=1` to connect to the namespace set in the `ns` property of your `objectscript.conn` settings object.
+- Enter `http://localhost:50773/:`_namespace_`?token=1` to connect to a different namespace.
+
+Your `objectscript.conn` must have one of the following formats:
+- `{ "active": true, "host": "xxx", "port": nn, "username": "uuu", "password": "***", "ns": "YYY" }`
+- `{ "active": true, "server": "xxx", "ns": "YYY" }`
+
+The first format requires a password to be stored as plaintext. The second format avoids this risk by leveraging Server Manager's secure credential storage.
+
+Both formats may optionally specify `"https": true`.
 
 ## Other Resources
 
