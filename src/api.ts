@@ -98,36 +98,49 @@ export abstract class ApiBase {
 					return { server: serverName, namespace, serverSpec };
 				}
 				if (serverName === '') {
-					const conn = vscode.workspace.getConfiguration('objectscript')?.get<any>('conn');
-					if (!conn) {
+
+					const getObjectScriptAPI = (async(): Promise<any> => {
+						const targetExtension = vscode.extensions.getExtension("intersystems-community.vscode-objectscript");
+						if (!targetExtension) {
+						  return undefined;
+						}
+						if (!targetExtension.isActive) {
+						  await targetExtension.activate();
+						}
+						const api = targetExtension.exports;
+					
+						if (!api) {
+						  return undefined;
+						}
+						return api;
+					});
+					const osAPI = await getObjectScriptAPI();
+					if (!osAPI) {
+						throw new Error('Missing intersystems-community.vscode-objectscript API');
+					}
+					const osServer = osAPI.serverForUri();
+					if (!osServer) {
 						throw new Error('Missing objectscript.conn');
 					}
-					if (!conn.active) {
+					if (!osServer.active) {
 						throw new Error('Disabled objectscript.conn');
 					}
-					const { server, host, port, https, username, password, ns } = conn;
+					serverSpec = {
+						username: osServer.username,
+						password: osServer.password,
+						name: osServer.serverName,
+						webServer: {
+						  host: osServer.host,
+						  port: osServer.port,
+						  pathPrefix: osServer.pathPrefix,
+						  scheme: osServer.scheme
+						}
+					};
 					if (namespace === '') {
-						namespace = ns;
+						namespace = osServer.namespace;
 					}
-					if (server) {
-						serverName = server;
-					}
-					else {
-						if (host && port && username && password) {
-							serverSpec = {
-								name: '_objectscript.conn_',
-								webServer: {
-									host,
-									port,
-									scheme: https ? 'https' : 'http'
-								},
-								username,
-								password
-							};
-						}
-						else {
-							throw new Error('objectscript.conn must specify host, port, username and password');
-						}
+					if (osServer.serverName) {
+						serverName = osServer.serverName;
 					}
 				}
 				if (!serverSpec) {
