@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { FastifyInstance, FastifyRequest } from "fastify";
 import * as FastifyWS from "@fastify/websocket";
 import * as nteract from "@nteract/messaging";
-import { ApiBase, IRequestGeneric, IRouteGeneric } from "../api";
+import { ApiBase, IRequestGeneric } from "../api";
 import { JupyterServerAPI } from "../jupyterServerAPI";
 import { ServerNamespaceMgr } from "../serverNamespaceMgr";
 import console = require("console");

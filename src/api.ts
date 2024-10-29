@@ -28,19 +28,12 @@ export interface IProcess extends JupyterServerAPI.IKernel {
 	executionCount: number
 }
 
-export interface IRouteGeneric extends RouteGenericInterface {
-	Params: {
-		serverNamespace: string // server:namespace
-	},
-
-	Body: string
+export interface IParams {
+	serverNamespace: string // server:namespace
 }
 
 export interface IRequestGeneric extends RequestGenericInterface {
-	Params: {
-		serverNamespace: string // server:namespace
-	},
-
+	Params: IParams,
 	Body: string
 }
 
@@ -108,7 +101,7 @@ export abstract class ApiBase {
 						  await targetExtension.activate();
 						}
 						const api = targetExtension.exports;
-					
+
 						if (!api) {
 						  return undefined;
 						}

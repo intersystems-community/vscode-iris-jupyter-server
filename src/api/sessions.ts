@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { FastifyInstance, FastifyRequest } from "fastify";
-import { ApiBase, IRequestGeneric } from "../api";
+import { ApiBase, IRequestGeneric, IParams } from "../api";
 import { JupyterServerAPI } from "../jupyterServerAPI";
 import { ServerNamespaceMgr } from "../serverNamespaceMgr";
 import { IRISConnection } from '../iris';
@@ -22,7 +23,7 @@ export class SessionsApi extends ApiBase {
 			return result;
 		});
 
-		fastify.post('/:serverNamespace/api/sessions', (request: FastifyRequest<IRequestGeneric>, reply) => {
+		fastify.post<{ Body: JupyterServerAPI.ISession, Params: IParams }>('/:serverNamespace/api/sessions', (request, reply) => {
 			const { serverNamespace } = request.params;
 			const serverNamespaceMgr = ServerNamespaceMgr.get(serverNamespace);
 			if (!serverNamespaceMgr?.target.serverSpec) {
@@ -30,15 +31,8 @@ export class SessionsApi extends ApiBase {
 				return {};
 			}
 			const target = serverNamespaceMgr.target;
-			var session: JupyterServerAPI.ISession;
-			try {
-				session = JSON.parse(request.body);
-			}
-			catch (error) {
-				reply.code(400);
-				return {};
-			}
-			const { name, type, path, kernel } = session;
+			var session: JupyterServerAPI.ISession = request.body;
+			const { name, kernel } = session;
 
 			const existingSession = serverNamespaceMgr?.getSession(name);
 			if (existingSession) {
