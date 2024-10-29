@@ -5,7 +5,7 @@
 // the target is a Jupyter Hub. See https://github.com/microsoft/vscode-jupyter/blob/d52654ed850fba4ff241b4aa2e9f62cb082b3f71/src/kernels/jupyter/launcher/jupyterPasswordConnect.ts#L412-L419
 
 import * as vscode from 'vscode';
-import { FastifyInstance, FastifyRequest, RequestGenericInterface, RouteGenericInterface } from 'fastify';
+import { FastifyInstance, FastifyRequest, RequestGenericInterface } from 'fastify';
 import { IRISConnection } from './iris';
 import * as serverManager from '@intersystems-community/intersystems-servermanager';
 import { IServerSpec, Server } from './server';
@@ -230,7 +230,7 @@ export abstract class ApiBase {
 
 export class MiscApi extends ApiBase {
 
-	static addRoutes(fastify:FastifyInstance) {
+	static addRoutes(fastify: FastifyInstance) {
 
 		fastify.get('/:serverNamespace/hub/api', (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const { serverNamespace } = request.params;
