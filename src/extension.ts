@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import Fastify from 'fastify';
 import * as FastifyWS from '@fastify/websocket';
+import { Jupyter } from '@vscode/jupyter-extension';
 import { KernelsApi } from './api/kernels';
 import { MiscApi } from './api';
 import { SessionsApi } from './api/sessions';
@@ -14,6 +15,14 @@ export function activate(context: vscode.ExtensionContext) {
 	extensionUri = context.extensionUri;
 	logChannel = vscode.window.createOutputChannel('IRIS Jupyter Server Proxy', { log: true});
 	logChannel.info('Extension activated');
+
+	const jupyterExt = vscode.extensions.getExtension<Jupyter>('ms-toolsai.jupyter');
+	if (!jupyterExt) {
+		throw new Error('Jupyter Extension not installed');
+	}
+	if (!jupyterExt.isActive) {
+		jupyterExt.activate();
+	}
 
 	const fastify = Fastify({
 		//logger: true
