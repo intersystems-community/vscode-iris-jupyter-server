@@ -23,7 +23,7 @@ export class SessionsApi extends ApiBase {
 			return result;
 		});
 
-		fastify.post<{ Body: JupyterServerAPI.ISession, Params: IParams }>('/:serverNamespace/api/sessions', (request, reply) => {
+		fastify.post('/:serverNamespace/api/sessions', (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const { serverNamespace } = request.params;
 			const serverNamespaceMgr = ServerNamespaceMgr.get(serverNamespace);
 			if (!serverNamespaceMgr?.target.serverSpec) {
@@ -31,7 +31,15 @@ export class SessionsApi extends ApiBase {
 				return {};
 			}
 			const target = serverNamespaceMgr.target;
-			var session: JupyterServerAPI.ISession = request.body;
+
+			var session: JupyterServerAPI.ISession;
+			try {
+				session = JSON.parse(request.body);
+			}
+			catch (error) {
+				reply.code(400);
+				return {};
+			}
 			const { name, kernel } = session;
 
 			const existingSession = serverNamespaceMgr?.getSession(name);
