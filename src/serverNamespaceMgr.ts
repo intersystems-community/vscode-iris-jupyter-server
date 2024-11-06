@@ -31,12 +31,12 @@ export class ServerNamespaceMgr extends Disposable {
 		return Array.from<JupyterServerAPI.IKernel>(this._augmentedKernelMap.values());
 	}
 
-	getKernel(id: string): JupyterServerAPI.IKernel | undefined {
-		return this._augmentedKernelMap.get(id);
+	getKernel(kernelId: string): JupyterServerAPI.IKernel | undefined {
+		return this._augmentedKernelMap.get(kernelId);
 	}
 
-	getProcess(id: string): IProcess | undefined {
-		return this._augmentedKernelMap.get(id);
+	getProcess(kernelId: string): IProcess | undefined {
+		return this._augmentedKernelMap.get(kernelId);
 	}
 
 	allSessions(): JupyterServerAPI.ISession[] {
