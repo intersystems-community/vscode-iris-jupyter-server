@@ -97,7 +97,7 @@ export async function activate(context: vscode.ExtensionContext) {
 				}
 				return servers;
 			},
-			resolveJupyterServer: ((server) => server),
+			resolveJupyterServer: ((server: any) => server),
 		}
 	);
 	context.subscriptions.push(serverCollection);
@@ -114,7 +114,7 @@ export async function activate(context: vscode.ExtensionContext) {
 				},
 			];
 		},
-		handleCommand: async (command, token) => {
+		handleCommand: async (command: any, token: any) => {
 			if (command.label === ADD_HOST_COMMAND_LABEL) {
 
 				const disposables: vscode.Disposable[] = [];

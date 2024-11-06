@@ -71,18 +71,29 @@ export class KernelsApi extends ApiBase {
 			// TODO
 			const serverNamespace = request.params.serverNamespace;
 			const kernelId = request.params.kernelId;
-			const kernel = ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
-			if (!kernel) {
+			const mgr = ServerNamespaceMgr.get(serverNamespace);
+			if (!mgr) {
 				reply.code(404);
-				return;
+				return {};
+			}
+			const kernel = mgr.getKernel(kernelId);
+			const process = mgr.getProcess(kernelId);
+			if (!kernel || !process) {
+				// Nothing to do
+				reply.code(204);
+				return {};
 			}
 
-			//TODO Delete
-			reply.code(404);
-			return;
-
-			reply.code(204);
-			return kernel;
+			const jobNumber = process.connection.iris.classMethodValue('%SYSTEM.SYS', 'ProcessID');
+			const result = process.connection.iris.classMethodValue('%SYSTEM.Process', 'Terminate', jobNumber);
+			if (result === 1) {
+				reply.code(204);
+				mgr.deleteKernel(kernelId);
+			}
+			else {
+				reply.code(404);
+			}
+			return {};
 		});
 
 		fastify.post('/:serverNamespace/api/kernels/:kernelId/interrupt', (request: FastifyRequest<IRequestKernel>, reply) => {
@@ -93,7 +104,7 @@ export class KernelsApi extends ApiBase {
 			const process = ServerNamespaceMgr.get(serverNamespace)?.getProcess(kernelId);
 			if (!process) {
 				reply.code(404);
-				return;
+				return {};
 			}
 
 			//TODO - Blocked by Node.js Native API not being async
@@ -101,11 +112,12 @@ export class KernelsApi extends ApiBase {
 			const result = process.connection.iris.classMethodValue('%SYSTEM.Process', 'Terminate', jobNumber);
 			if (result === 1) {
 				reply.code(204);
+				ServerNamespaceMgr.get(serverNamespace)?.deleteKernel(kernelId);
 			}
 			else {
 				reply.code(404);
 			}
-			return;
+			return {};
 		});
 
 		fastify.post('/:serverNamespace/api/kernels/:kernelId/restart', (request: FastifyRequest<IRequestKernel>, reply) => {
@@ -166,38 +178,39 @@ export class KernelsApi extends ApiBase {
 					};
 
 					const sendMessage = (msg: nteract.JupyterMessage, newStatus?: string) => {
-						const offsetCount = 5 + (msg.buffers?.length || 0);
+						const offsetCount = 6 + (msg.buffers?.length || 0);
 						const offsetsBuffer = Buffer.alloc((offsetCount + 1) * 8);
+						offsetsBuffer.writeUInt32LE(offsetCount, 0);
 						let offset = (offsetCount + 1) * 8;
-						offsetsBuffer.writeUInt32LE(offsetCount + 1, 0);
 
 						let chunkNumber = 0;
 						let chunk = msg.channel;
 						let outString = chunk;
-						offset += Buffer.byteLength(chunk);
 						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+						offset += Buffer.byteLength(chunk);
 
 						chunk = JSON.stringify(msg.header);
 						outString += chunk;
-						offset += Buffer.byteLength(chunk);
 						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+						offset += Buffer.byteLength(chunk);
 
 						chunk = JSON.stringify(msg.parent_header);
 						outString += chunk;
-						offset += Buffer.byteLength(chunk);
 						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+						offset += Buffer.byteLength(chunk);
 
 						chunk = JSON.stringify(msg.metadata);
 						outString += chunk;
-						offset += Buffer.byteLength(chunk);
 						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+						offset += Buffer.byteLength(chunk);
 
 						chunk = JSON.stringify(msg.content);
 						outString += chunk;
-						offset += Buffer.byteLength(chunk);
 						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+						offset += Buffer.byteLength(chunk);
 
 						for (const buffer of msg.buffers || []) {
+							offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
 							if (buffer instanceof ArrayBuffer) {
 								outString += buffer;
 								offset += buffer.byteLength;
@@ -205,10 +218,14 @@ export class KernelsApi extends ApiBase {
 								outString += buffer.buffer;
 								offset += buffer.buffer.byteLength;
 							}
-							offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
 						}
 
-						socket.send(offsetsBuffer + outString, () => {
+						// The final offset is for an imaginary additional chunk
+						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+
+						const outBuffer = Buffer.from(outString);
+
+						socket.send(Buffer.concat([offsetsBuffer, outBuffer]), () => {
 							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
 							if (newStatus) {
 								sendStatus(newStatus);
@@ -301,7 +318,7 @@ export class KernelsApi extends ApiBase {
 
 					logChannel.debug(` < kernel '${kernelId}' socket message received, channel ${messageObj.channel}, type ${messageObj.header.msg_type} message=${JSON.stringify(messageObj)}`);
 
-					//sendStatus('busy');
+					sendStatus('busy');
 
 					////broadcast(message);
 
@@ -466,10 +483,10 @@ export class KernelsApi extends ApiBase {
 					if (reply) {
 						reply.header.session = kernelSessionId;
 						reply.header.username = 'iris-jupyter-server';
-						//sendMessage(reply, 'idle');
+						sendMessage(reply, 'idle');
 					}
 					else {
-						//sendStatus('idle');
+						sendStatus('idle');
 					}
 
 				});

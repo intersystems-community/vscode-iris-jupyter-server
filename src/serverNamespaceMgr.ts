@@ -60,6 +60,20 @@ export class ServerNamespaceMgr extends Disposable {
 		return session;
 	}
 
+	deleteKernel(kernelId: string) {
+		logChannel.debug(`ServerNamespaceMgr: delete kernel ${kernelId}`);
+
+		const process = this._augmentedKernelMap.get(kernelId);
+		if (!process) {
+			return;
+		}
+
+		process.connection.dispose();
+		const sessionName = process.sessionName;
+		this._sessionMap.delete(sessionName);
+		this._augmentedKernelMap.delete(kernelId);
+	}
+
 	restartKernel(kernelId: string): string {
 		logChannel.debug(`ServerNamespaceMgr: restart kernel ${kernelId}`);
 
