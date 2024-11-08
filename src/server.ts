@@ -1,5 +1,5 @@
 import * as serverManager from '@intersystems-community/intersystems-servermanager';
-import { Disposable } from 'vscode';
+import { AuthenticationSessionAccountInformation, Disposable } from 'vscode';
 
 // Server Manager interfaces
 
@@ -10,6 +10,11 @@ export interface ISuperServerSpec {
 
 export interface IServerSpec extends serverManager.IServerSpec {
 	superServer?: ISuperServerSpec;
+}
+
+export function getAccount(serverSpec: IServerSpec): AuthenticationSessionAccountInformation | undefined {
+	const accountId = serverSpec.username ? `${serverSpec.name}/${serverSpec.username.toLowerCase()}` : undefined;
+	return accountId ? { id: accountId, label: '' } : undefined;
 }
 
 var serverMap = new Map<string, IServerSpec>();

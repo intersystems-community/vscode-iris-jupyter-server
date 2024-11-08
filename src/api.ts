@@ -8,7 +8,7 @@ import * as vscode from 'vscode';
 import { FastifyInstance, FastifyRequest, RequestGenericInterface } from 'fastify';
 import { IRISConnection } from './iris';
 import * as serverManager from '@intersystems-community/intersystems-servermanager';
-import { IServerSpec, Server } from './server';
+import { getAccount, IServerSpec, Server } from './server';
 import { ServerNamespaceMgr } from './serverNamespaceMgr';
 import { JupyterServerAPI } from './jupyterServerAPI';
 import { logoutREST, makeRESTRequest } from './makeRESTRequest';
@@ -202,9 +202,10 @@ export abstract class ApiBase {
 					}
 					if (typeof serverSpec.password === 'undefined') {
 						const scopes = [serverSpec.name, serverSpec.username || ''];
-						let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
+						const account = getAccount(serverSpec);
+						let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true, account });
 						if (!session) {
-							session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
+							session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true, account });
 						}
 						if (session) {
 							serverSpec.username = session.scopes[1];

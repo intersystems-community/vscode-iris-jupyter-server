@@ -7,6 +7,7 @@ import { KernelsApi } from './api/kernels';
 import { MiscApi } from './api';
 import { SessionsApi } from './api/sessions';
 import { makeRESTRequest } from './makeRESTRequest';
+import { getAccount } from './server';
 //import { ContentsApi } from './api/contents';
 
 export let extensionUri: vscode.Uri;
@@ -199,9 +200,10 @@ export async function activate(context: vscode.ExtensionContext) {
 					}
 					if (typeof serverSpec.password === 'undefined') {
 						const scopes = [serverSpec.name, serverSpec.username || ''];
-						let session = await vscode.authentication.getSession(ServerManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
+						const account = getAccount(serverSpec);
+						let session = await vscode.authentication.getSession(ServerManager.AUTHENTICATION_PROVIDER, scopes, { silent: true, account });
 						if (!session) {
-							session = await vscode.authentication.getSession(ServerManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
+							session = await vscode.authentication.getSession(ServerManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true, account });
 						}
 						if (session) {
 							serverSpec.username = session.scopes[1];
