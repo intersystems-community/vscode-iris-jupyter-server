@@ -86,8 +86,51 @@ export abstract class ApiBase {
 
 				let serverName = parts[0].toLowerCase();
 				let namespace = parts[1].toUpperCase();
+
+				// Check existence of server-side support class, and install it if absent
+				const checkNamespace = (async (serverSpec: IServerSpec) => {
+					const runQuery = ((serverSpec: IServerSpec) => {
+						return makeRESTRequest(
+							'POST',
+							serverSpec,
+							{ apiVersion: 1, namespace, path: '/action/query' },
+							{ query: 'SELECT PolyglotKernel.CodeExecutor_HostName() AS Host, PolyglotKernel.CodeExecutor_SuperServerPort() AS Port', parameters: [] }
+						);
+					});
+					try {
+						let response = await runQuery(serverSpec);
+						if (response !== undefined) {
+							if (response.data.result.content === undefined) {
+								if (response.data.status?.errors[0]?.code !== 5540) {
+									throw new Error(response.data.status.summary);
+								}
+								// Class is missing, so load and compile it, then re-run the query
+								const choice = await vscode.window.showInformationMessage(`Polyglot.CodeExecutor class not found in ${serverSpec.name}:${namespace}. Load it now?`, { modal: true }, { title: 'Yes' }, { title: 'No', isCloseAffordance: true });
+								if (choice?.title !== 'Yes') {
+									throw new Error('Polyglot.CodeExecutor class not available');
+								}
+								await loadAndCompile(serverSpec, namespace);
+								response = await runQuery(serverSpec);
+								if (response?.data.result.content === undefined) {
+									throw new Error(`Retry failed after class load: ${response?.data.status.summary ?? 'Unknown'}`);
+								}
+							}
+							const host = serverSpec.superServer?.host ?? response.data.result.content[0].Host;
+							const port = serverSpec.superServer?.port ?? response.data.result.content[0].Port;
+							serverSpec.superServer = { host, port };
+						}
+					} catch (error) {
+						throw error;
+					} finally {
+						await logoutREST(serverSpec);
+					}
+				});
+
 				let serverSpec = Server.get(serverName);
 				if (serverSpec) {
+					if (!ServerNamespaceMgr.get(serverNamespace)) {
+						await checkNamespace(serverSpec);
+					}
 					return { server: serverName, namespace, serverSpec };
 				}
 				if (serverName === '') {
@@ -174,44 +217,11 @@ export abstract class ApiBase {
 				}
 
 				// Check existence of server-side support class, and install it if absent
-				const runQuery = ((serverSpec: IServerSpec) => {
-					return makeRESTRequest(
-						'POST',
-						serverSpec,
-						{ apiVersion: 1, namespace, path: '/action/query' },
-						{ query: 'SELECT PolyglotKernel.CodeExecutor_HostName() AS Host, PolyglotKernel.CodeExecutor_SuperServerPort() AS Port', parameters: [] }
-					);
-				});
-				try {
-					let response = await runQuery(serverSpec);
-					if (response !== undefined) {
-						if (response.data.result.content === undefined) {
-							if (response.data.status?.errors[0]?.code !== 5540) {
-								throw new Error(response.data.status.summary);
-							}
-							// Class is missing, so load and compile it, then re-run the query
-							const choice = await vscode.window.showInformationMessage(`Polyglot.CodeExecutor class not found in ${serverSpec.name}:${namespace}. Load it now?`, { modal: true }, { title: 'Yes' }, { title: 'No', isCloseAffordance: true });
-							if (choice?.title !== 'Yes') {
-								throw new Error('Polyglot.CodeExecutor class not available');
-							}
-							await loadAndCompile(serverSpec, namespace);
-							response = await runQuery(serverSpec);
-							if (response?.data.result.content === undefined) {
-								throw new Error(`Retry failed after class load: ${response?.data.status.summary ?? 'Unknown'}`);
-							}
-						}
-						const host = serverSpec.superServer?.host ?? response.data.result.content[0].Host;
-						const port = serverSpec.superServer?.port ?? response.data.result.content[0].Port;
-						serverSpec.superServer = { host, port };
-					}
-				} catch (error) {
-					throw error;
-				} finally {
-					await logoutREST(serverSpec);
-				}
+				await checkNamespace(serverSpec);
 
 				return { server: serverName, namespace, serverSpec };
 			});
+
 			const target = await resolveTarget();
 			if (target.serverSpec) {
 				if (!Server.get(serverNamespace)) {
