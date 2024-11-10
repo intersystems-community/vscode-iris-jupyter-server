@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import * as vscode from 'vscode';
 import Fastify from 'fastify';
 import * as FastifyWS from '@fastify/websocket';
@@ -14,6 +15,8 @@ export let extensionUri: vscode.Uri;
 export let logChannel: vscode.LogOutputChannel;
 
 let serverManagerApi: any;
+let jupyterApi: any;
+let jupyterKernelService: any;
 
 export async function activate(context: vscode.ExtensionContext) {
 
@@ -28,6 +31,8 @@ export async function activate(context: vscode.ExtensionContext) {
 	if (!jupyterExt.isActive) {
 		await jupyterExt.activate();
 	}
+	jupyterApi = jupyterExt.exports;
+
 	const serverManagerExt = vscode.extensions.getExtension(ServerManager.EXTENSION_ID);
 	if (!serverManagerExt) {
 		throw new Error('Server Manager extension not installed');
@@ -295,6 +300,41 @@ export async function activate(context: vscode.ExtensionContext) {
 			return serverNamespace ? jupyterServer(serverNamespace) : undefined;
 		},
 	};
+
+
+	// The command we add to the Server Manager tree at the namespace level
+	context.subscriptions.push(vscode.commands.registerCommand('iris-jupyter-server.intersystems-servermanager.newNotebook', async (serverTreeItem) => {
+        const idArray: string[] = serverTreeItem.id.split(':');
+        const serverId = idArray[1];
+        const namespace = idArray[3];
+		const serverNamespace = `${serverId}:${namespace}`;
+
+		if (!jupyterKernelService) {
+			jupyterKernelService = await jupyterApi.getKernelService();
+			if (!jupyterKernelService) {
+				vscode.window.showErrorMessage('Cannot access jupyterApi.getKernelService() - try using VS Code Insiders');
+				return;
+			}
+		}
+
+		const kernelConnectionMetadataArray = await jupyterKernelService.getKernelSpecifications();
+
+		await vscode.commands.executeCommand('ipynb.newUntitledIpynb');
+        const nb = vscode.window.activeNotebookEditor?.notebook;
+        if (!nb) {
+            return;
+        }
+
+		const kind = 'startUsingRemoteKernelSpec';
+		const baseUrl = jupyterServer(serverNamespace).connectionInformation?.baseUrl?.toString(true) || '';
+		const kernelSpecName = 'iris-objectscript';
+		const kernelConnectionMetadata = kernelConnectionMetadataArray.find((item: any) => item.kind === kind && item.baseUrl === baseUrl && item.kernelSpec.name === kernelSpecName);
+		if (!kernelConnectionMetadata) {
+			vscode.window.showErrorMessage(`Cannot yet find kernelSpec '${kernelSpecName}' on '${serverNamespace}'`);
+			return;
+		}
+        jupyterApi.openNotebook(nb.uri, kernelConnectionMetadata.id);
+	}));
 
 	// Return the JupyterServer object for a given server:NAMESPACE
 	function jupyterServer(serverNamespace: string): JupyterServer {

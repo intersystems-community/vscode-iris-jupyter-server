@@ -50,6 +50,28 @@
         ]
       }
     ],
+    "commands": [
+      {
+        "command": "iris-jupyter-server.intersystems-servermanager.newNotebook",
+        "title": "New Notebook",
+        "icon": "$(notebook)"
+      }
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "iris-jupyter-server.intersystems-servermanager.newNotebook",
+          "when": "view == intersystems-community_servermanager && viewItem =~ /namespace$/",
+          "group": "inline@26"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "iris-jupyter-server.intersystems-servermanager.newNotebook",
+          "when": "false"
+        }
+      ]
+    },
     "configuration": {
       "title": "IRIS Jupyter Server",
       "properties": {
