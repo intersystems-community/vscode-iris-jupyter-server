@@ -354,8 +354,22 @@ export async function activate(context: vscode.ExtensionContext) {
 		// Find it
 		const kernelConnectionMetadata = kernelConnectionMetadataArray.find((item: any) => item.kind === kind && item.baseUrl === baseUrl && item.kernelSpec.name === kernelSpecName);
 		if (!kernelConnectionMetadata) {
-			if (!kernelConnectionMetadata) {
-				const mdMessage =
+
+			const hosts = vscode.workspace.getConfiguration('iris-jupyter-server').get<IHosts>('hosts') || {};
+			if (!hosts[serverNamespace]?.enabled) {
+				const serverSpec = await serverManagerApi.getServerSpec(serverId);
+				if (!serverSpec?.superServer?.port) {
+					const errorMessageCell = new vscode.NotebookCellData(vscode.NotebookCellKind.Markup, `To operate as an IRIS Notebook Host the **${serverId}** server definition requires its superserver port number.`, 'markdown');
+					const workspaceEdit = new vscode.WorkspaceEdit();
+					workspaceEdit.set(nbUri, [new vscode.NotebookEdit(new vscode.NotebookRange(0, nbEditor.notebook.cellCount), [errorMessageCell])]);
+					await vscode.workspace.applyEdit(workspaceEdit);
+					return;
+				}
+				await vscode.workspace.getConfiguration('iris-jupyter-server').update('hosts', { ...hosts, [serverNamespace]: { enabled: true } }, vscode.ConfigurationTarget.Global);
+			}
+
+
+			const mdMessage =
 `# First Time Use on ${serverNamespace} 
 The IRIS Notebook Host **${serverNamespace}** must initially be accessed from the notebook kernel picker.
 
@@ -368,11 +382,10 @@ The IRIS Notebook Host **${serverNamespace}** must initially be accessed from th
 
 You can then close and discard the original notebook containing these instructions.
 `;
-				const waitMessageCell = new vscode.NotebookCellData(vscode.NotebookCellKind.Markup, mdMessage, 'markdown');
-				const workspaceEdit = new vscode.WorkspaceEdit();
-				workspaceEdit.set(nbUri, [new vscode.NotebookEdit(new vscode.NotebookRange(0, nbEditor.notebook.cellCount), [waitMessageCell])]);
-				await vscode.workspace.applyEdit(workspaceEdit);
-			}
+			const waitMessageCell = new vscode.NotebookCellData(vscode.NotebookCellKind.Markup, mdMessage, 'markdown');
+			const workspaceEdit = new vscode.WorkspaceEdit();
+			workspaceEdit.set(nbUri, [new vscode.NotebookEdit(new vscode.NotebookRange(0, nbEditor.notebook.cellCount), [waitMessageCell])]);
+			await vscode.workspace.applyEdit(workspaceEdit);
 			return;
 		}
         await jupyterApi.openNotebook(nbUri, kernelConnectionMetadata.id);
