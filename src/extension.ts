@@ -308,32 +308,63 @@ export async function activate(context: vscode.ExtensionContext) {
         const serverId = idArray[1];
         const namespace = idArray[3];
 		const serverNamespace = `${serverId}:${namespace}`;
+		let firstCall = false;
 
 		if (!jupyterKernelService) {
+			firstCall = true;
 			jupyterKernelService = await jupyterApi.getKernelService();
 			if (!jupyterKernelService) {
 				vscode.window.showErrorMessage('Cannot access jupyterApi.getKernelService() - try using VS Code Insiders');
 				return;
 			}
+			jupyterKernelService.onDidChangeKernelSpecifications(() => {
+				console.log('Kernel specs changed');
+			});
+		}
+
+		await vscode.commands.executeCommand('ipynb.newUntitledIpynb');
+        const nbEditor = vscode.window.activeNotebookEditor;
+        if (!nbEditor) {
+            return;
+        }
+		const nbUri = nbEditor.notebook.uri;
+
+		const SECONDS_TO_WAIT = 10;
+		if (firstCall) {
+			const waitMessageCell = new vscode.NotebookCellData(vscode.NotebookCellKind.Markup, `Please wait ${SECONDS_TO_WAIT} seconds while your first IRIS notebook initializes...`, 'markdown');
+			const workspaceEdit = new vscode.WorkspaceEdit();
+			workspaceEdit.set(nbUri, [new vscode.NotebookEdit(new vscode.NotebookRange(0, nbEditor.notebook.cellCount), [waitMessageCell])]);
+			await vscode.workspace.applyEdit(workspaceEdit);
+			await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Waiting ${SECONDS_TO_WAIT} seconds for IRIS Notebook Servers to be ready...` }, async (progress) => {
+				for (let i = 0; i < SECONDS_TO_WAIT; i++) {
+					progress.report({ increment: Math.ceil(100 / SECONDS_TO_WAIT) });
+					await new Promise(resolve => setTimeout(resolve, 1_000));
+				}
+			});
 		}
 
 		const kernelConnectionMetadataArray = await jupyterKernelService.getKernelSpecifications();
 
-		await vscode.commands.executeCommand('ipynb.newUntitledIpynb');
-        const nb = vscode.window.activeNotebookEditor?.notebook;
-        if (!nb) {
-            return;
-        }
-
+		// What to find
 		const kind = 'startUsingRemoteKernelSpec';
 		const baseUrl = jupyterServer(serverNamespace).connectionInformation?.baseUrl?.toString(true) || '';
 		const kernelSpecName = 'iris-objectscript';
+
+		// Find it
 		const kernelConnectionMetadata = kernelConnectionMetadataArray.find((item: any) => item.kind === kind && item.baseUrl === baseUrl && item.kernelSpec.name === kernelSpecName);
 		if (!kernelConnectionMetadata) {
-			vscode.window.showErrorMessage(`Cannot yet find kernelSpec '${kernelSpecName}' on '${serverNamespace}'`);
+			if (!kernelConnectionMetadata) {
+				vscode.window.showErrorMessage(`Cannot yet find kernelSpec '${kernelSpecName}' on '${serverNamespace}'`);
+			}
 			return;
 		}
-        jupyterApi.openNotebook(nb.uri, kernelConnectionMetadata.id);
+        await jupyterApi.openNotebook(nbUri, kernelConnectionMetadata.id);
+		const welcomeMessageCell = new vscode.NotebookCellData(vscode.NotebookCellKind.Markup, `New IRIS ObjectScript notebook connected to **${serverNamespace}**`, 'markdown');
+		const infoCell = new vscode.NotebookCellData(vscode.NotebookCellKind.Code, ' WRITE "Process ", $JOB, " in namespace ", $NAMESPACE, " on server ", $SYSTEM, " (", $ZVERSION, ")",!', 'objectscript-int');
+		const workspaceEdit = new vscode.WorkspaceEdit();
+		workspaceEdit.set(nbUri, [new vscode.NotebookEdit(new vscode.NotebookRange(0, nbEditor.notebook.cellCount), [welcomeMessageCell, infoCell])]);
+		await vscode.workspace.applyEdit(workspaceEdit);
+		await vscode.commands.executeCommand('notebook.execute');
 	}));
 
 	// Return the JupyterServer object for a given server:NAMESPACE
