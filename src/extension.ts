@@ -11,6 +11,10 @@ import { makeRESTRequest } from './makeRESTRequest';
 import { getAccount } from './server';
 //import { ContentsApi } from './api/contents';
 
+interface IHosts {
+	[key: string]: { enabled: boolean };
+}
+
 export let extensionUri: vscode.Uri;
 export let logChannel: vscode.LogOutputChannel;
 
@@ -244,9 +248,6 @@ export async function activate(context: vscode.ExtensionContext) {
 				await KernelsApi.getTarget(serverNamespace);
 
 				// Add to the configuration if not already there
-				interface IHosts {
-					[key: string]: { enabled: boolean };
-				}
 				const inspectedSetting = vscode.workspace.getConfiguration('iris-jupyter-server', vscode.window.activeNotebookEditor?.notebook.uri).inspect<IHosts>('hosts') || { key: 'iris-jupyter-server.hosts' };
 
 				// Add to the appropriate configuration if not already there, or if disabled
@@ -329,7 +330,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }
 		const nbUri = nbEditor.notebook.uri;
 
-		const SECONDS_TO_WAIT = 10;
+		const SECONDS_TO_WAIT = 5;
 		if (firstCall) {
 			const waitMessageCell = new vscode.NotebookCellData(vscode.NotebookCellKind.Markup, `Please wait ${SECONDS_TO_WAIT} seconds while your first IRIS notebook initializes...`, 'markdown');
 			const workspaceEdit = new vscode.WorkspaceEdit();
@@ -354,7 +355,23 @@ export async function activate(context: vscode.ExtensionContext) {
 		const kernelConnectionMetadata = kernelConnectionMetadataArray.find((item: any) => item.kind === kind && item.baseUrl === baseUrl && item.kernelSpec.name === kernelSpecName);
 		if (!kernelConnectionMetadata) {
 			if (!kernelConnectionMetadata) {
-				vscode.window.showErrorMessage(`Cannot yet find kernelSpec '${kernelSpecName}' on '${serverNamespace}'`);
+				const mdMessage =
+`# First Time Use on ${serverNamespace} 
+The IRIS Notebook Host **${serverNamespace}** must initially be accessed from the notebook kernel picker.
+
+## Instructions
+1. Click the button in the top right of this notebook, captioned either **Select Kernel** or **Detecting Kernels**.
+2. If the next picker is titled 'Select Kernel' choose **IRIS Notebook Servers...**. Otherwise choose **Select Another Kernel...**, then choose **IRIS Notebook Servers...** from that picker.
+4. Choose **${serverNamespace}** from the picker titled 'Select a Jupyter Server'.
+5. When the picker titled 'Select a Kernel from ${serverNamespace}' is populated wait a couple of seconds, then press the 'Esc' key while focus is on its input field.
+6. Back on the INTERSYSTEMS: SERVERS view click again on the **New Notebook** button of the **${namespace}** namespace folder under the **${serverId}** server.
+
+You can then close and discard the original notebook containing these instructions.
+`;
+				const waitMessageCell = new vscode.NotebookCellData(vscode.NotebookCellKind.Markup, mdMessage, 'markdown');
+				const workspaceEdit = new vscode.WorkspaceEdit();
+				workspaceEdit.set(nbUri, [new vscode.NotebookEdit(new vscode.NotebookRange(0, nbEditor.notebook.cellCount), [waitMessageCell])]);
+				await vscode.workspace.applyEdit(workspaceEdit);
 			}
 			return;
 		}
