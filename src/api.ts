@@ -8,18 +8,18 @@ import * as vscode from 'vscode';
 import { FastifyInstance, FastifyRequest, RequestGenericInterface } from 'fastify';
 import { IRISConnection } from './iris';
 import * as serverManager from '@intersystems-community/intersystems-servermanager';
-import { getAccount, IServerSpec, Server } from './server';
 import { ServerNamespaceMgr } from './serverNamespaceMgr';
 import { JupyterServerAPI } from './jupyterServerAPI';
 import { logoutREST, makeRESTRequest } from './makeRESTRequest';
 import { extensionUri, logChannel } from './extension';
 import { Mutex } from 'async-mutex';
+import { Server } from './server';
 
 // Our interfaces
 export interface ITarget {
 	server: string,
 	namespace: string,
-	serverSpec?: IServerSpec
+	serverSpec?: serverManager.IServerSpec
 }
 
 export interface IProcess extends JupyterServerAPI.IKernel {
@@ -38,7 +38,7 @@ export interface IRequestGeneric extends RequestGenericInterface {
 }
 
 // The Server Manager API handle
-let serverManagerApi: any;
+let serverManagerApi:  serverManager.ServerManagerAPI;
 
 export abstract class ApiBase {
 
@@ -51,7 +51,7 @@ export abstract class ApiBase {
 				return serverNamespaceMgr.target;
 			}
 
-			const loadAndCompile = (async (serverSpec: IServerSpec, namespace: string): Promise<void> => {
+			const loadAndCompile = (async (serverSpec: serverManager.IServerSpec, namespace: string): Promise<void> => {
 				const fileUri = vscode.Uri.joinPath(extensionUri, 'server/src/PolyglotKernel/CodeExecutor.cls');
 				const name = 'PolyglotKernel.CodeExecutor.cls';
 				const content = (await vscode.workspace.fs.readFile(fileUri)).toString().split('\n').map((line) => line.replace('\r', ''));
@@ -88,8 +88,8 @@ export abstract class ApiBase {
 				let namespace = parts[1].toUpperCase();
 
 				// Check existence of server-side support class, and install it if absent
-				const checkNamespace = (async (serverSpec: IServerSpec) => {
-					const runQuery = ((serverSpec: IServerSpec) => {
+				const checkNamespace = (async (serverSpec: serverManager.IServerSpec) => {
+					const runQuery = ((serverSpec: serverManager.IServerSpec) => {
 						return makeRESTRequest(
 							'POST',
 							serverSpec,
@@ -196,13 +196,13 @@ export abstract class ApiBase {
 						}
 						serverManagerApi = extension.exports;
 					}
-					serverSpec = await serverManagerApi.getServerSpec(serverName) as serverManager.IServerSpec;
+					serverSpec = await serverManagerApi.getServerSpec(serverName);
 					if (!serverSpec) {
 						return { server: serverName, namespace };
 					}
 					if (typeof serverSpec.password === 'undefined') {
 						const scopes = [serverSpec.name, serverSpec.username || ''];
-						const account = getAccount(serverSpec);
+						const account = serverManagerApi.getAccount(serverSpec);
 						let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true, account });
 						if (!session) {
 							session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true, account });

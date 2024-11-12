@@ -8,7 +8,6 @@ import { KernelsApi } from './api/kernels';
 import { MiscApi } from './api';
 import { SessionsApi } from './api/sessions';
 import { makeRESTRequest } from './makeRESTRequest';
-import { getAccount } from './server';
 //import { ContentsApi } from './api/contents';
 
 interface IHosts {
@@ -18,7 +17,7 @@ interface IHosts {
 export let extensionUri: vscode.Uri;
 export let logChannel: vscode.LogOutputChannel;
 
-let serverManagerApi: any;
+let serverManagerApi: ServerManager.ServerManagerAPI;
 let jupyterApi: any;
 let jupyterKernelService: any;
 
@@ -201,15 +200,19 @@ export async function activate(context: vscode.ExtensionContext) {
 				quickPick.show();
 			})
 			.then(async (serverName) => {
+				if (serverName === undefined) {
+					return;
+				}
 				return await new Promise<string | undefined>(async (resolve, reject) => {
 					const serverSpec = await serverManagerApi.getServerSpec(serverName);
-					if (!serverSpec) {
+					if (serverSpec === undefined) {
 						vscode.window.showErrorMessage(`Server '${serverName}' is not defined`);
 						resolve(undefined);
+						return;
 					}
 					if (typeof serverSpec.password === 'undefined') {
 						const scopes = [serverSpec.name, serverSpec.username || ''];
-						const account = getAccount(serverSpec);
+						const account = serverManagerApi.getAccount(serverSpec);
 						let session = await vscode.authentication.getSession(ServerManager.AUTHENTICATION_PROVIDER, scopes, { silent: true, account });
 						if (!session) {
 							session = await vscode.authentication.getSession(ServerManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true, account });
