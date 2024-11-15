@@ -102,13 +102,27 @@ export async function activate(context: vscode.ExtensionContext) {
 		{
 			provideJupyterServers: () => {
 				const servers: JupyterServer[] = [];
-				const hosts = vscode.workspace.getConfiguration('iris-jupyter-server', vscode.window.activeNotebookEditor?.notebook.uri).get<{ enabled: boolean }[]>('hosts');
+				const scope = vscode.window.activeNotebookEditor?.notebook.uri;
+				const hosts = vscode.workspace.getConfiguration('iris-jupyter-server', scope).get<{ enabled: boolean }[]>('hosts');
 				if (typeof hosts === 'object' && hosts) {
 					for (const key in hosts) {
 						if (hosts[key].enabled === false) {
 							continue;
 						}
 						servers.push(jupyterServer(key));
+					}
+				}
+				const objectscriptConn = vscode.workspace.getConfiguration('objectscript', scope).get<{ active: boolean, ns: string, server: string, host: string, port: number, username: string, password: string, }>('conn');
+				if (objectscriptConn?.active && objectscriptConn.ns) {
+					const { ns, server, host, port, username, password } = objectscriptConn;
+					if (server && ns) {
+						const serverNamespace = `${server}:${ns.toUpperCase()}`;
+						if (!servers.find((server) => server.label === serverNamespace)) {
+							servers.push(jupyterServer(serverNamespace, `[${server}]:${ns.toUpperCase()}`));
+						}
+					}
+					else if (host && port && username && password && ns) {
+						servers.push(jupyterServer(':', `[${host}:${port}]:${ns.toUpperCase()}`));
 					}
 				}
 				return servers;
@@ -160,23 +174,14 @@ export async function activate(context: vscode.ExtensionContext) {
 			const disposables: vscode.Disposable[] = [];
 			const serverNamespace = await new Promise<string | undefined>(async (resolve, reject) => {
 
-				const servers: ServerManager.IServerName[] = await serverManagerApi.getServerNames();
-				const promisesOfEligibleServers = servers.map(async (server): Promise<ServerManager.IServerName | null> => {
-					const serverSpec: ServerManager.IServerSpec | undefined = await serverManagerApi.getServerSpec(server.name);
-					return (serverSpec?.superServer?.port === undefined)
-						? null
-						: { name: server.name, description: server.description, detail: `${serverSpec.superServer.host}:${serverSpec.superServer.port}` };
-				});
-				const eligibleServers = (await Promise.all(
-					promisesOfEligibleServers
-				)).filter((server): server is ServerManager.IServerName => server !== null);
+				const servers: ServerManager.IServerName[] = serverManagerApi.getServerNames();
 
 				const quickPick = vscode.window.createQuickPick();
 				disposables.push(quickPick);
 				quickPick.title = 'Choose IRIS Server';
-				quickPick.placeholder = 'Pick from your IRIS server definitions that specify a superserver port';
+				quickPick.placeholder = 'Pick from your IRIS server definitions';
 				quickPick.matchOnDescription = true;
-				quickPick.items = eligibleServers.map((serverName) => ({ label: serverName.name, description: `${serverName.detail}${serverName.description ? ` - ${serverName.description}` : ''}` }));
+				quickPick.items = servers.map((serverName) => ({ label: serverName.name, description: `${serverName.detail}${serverName.description ? ` - ${serverName.description}` : ''}` }));
 				quickPick.buttons = [vscode.QuickInputButtons.Back];
 				quickPick.onDidTriggerButton((e) => {
 					if (e === vscode.QuickInputButtons.Back) {
@@ -307,10 +312,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
 
 	// Return the JupyterServer object for a given server:NAMESPACE
-	function jupyterServer(serverNamespace: string): JupyterServer {
+	function jupyterServer(serverNamespace: string, label?: string): JupyterServer {
 		return {
 			id: `${context.extension.id}:${serverNamespace}`,
-			label: serverNamespace,
+			label: label ?? serverNamespace,
 			connectionInformation: {
 				baseUrl: vscode.Uri.parse(`http://localhost:50773/${serverNamespace}`),
 				token: '1',
