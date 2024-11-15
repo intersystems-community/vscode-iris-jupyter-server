@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 
 // Our version of Jupyter Server API types
 export namespace JupyterServerAPI {

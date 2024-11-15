@@ -1,16 +1,5 @@
-import * as serverManager from '@intersystems-community/intersystems-servermanager';
-import { Disposable } from 'vscode';
-
-// Server Manager interfaces
-
-export interface ISuperServerSpec {
-	host?: string;
-	port: number;
-}
-
-export interface IServerSpec extends serverManager.IServerSpec {
-	superServer?: ISuperServerSpec;
-}
+import { IServerSpec } from '@intersystems-community/intersystems-servermanager';
+import { AuthenticationSessionAccountInformation, Disposable } from 'vscode';
 
 var serverMap = new Map<string, IServerSpec>();
 

@@ -1,20 +1,20 @@
 # intersystems-community.iris-jupyter-server
 
-This VS Code extension is an alpha-quality proof of concept. It leverages [Microsoft's Jupyter extension](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter) to bring the notebook paradigm to developers working with InterSystems IRIS servers, both local and remote.
+This VS Code extension leverages [Microsoft's Jupyter extension](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter) to bring the notebook paradigm to developers working with InterSystems IRIS servers, both local and remote.
 
 ## Getting Started
 
 1. Install the extension. This will also install the Jupyter and ObjectScript extension packs if you don't already have them.
 2. Use [InterSystems Server Manager](https://marketplace.visualstudio.com/items?itemName=intersystems-community.servermanager) to define a connection to an IRIS server.
-> **Note:** IRIS developers who already use the `objectscript.conn` settings object and don't want to adopt Server Manager should consult a later section of this document for information applicable to them.
+> **Note:** IRIS developers who already use the `objectscript.conn` settings object and don't want to adopt Server Manager's `intersystems.servers` object for their server definitions are not required to do so. However `objectscript.conn` must contain values for `username` and `password`. Switching to use Server Manager would mean that plaintext password could be avoided.
 3. From VS Code's `File` menu select `New File...`. This option is also available on the Welcome page.
 4. When a quickpick appears, choose `Jupyter Notebook`.
-5. Click the `Detecting Kernels` button in the upper right of the notebook.
-6. In the quickpick titled "Select Kernel" choose `Existing Jupyter Server...`.
-7. In the next quickpick ("Select a Jupyter Server") choose `Enter the URL of the running Jupyter server`.
-8. Enter `http://localhost:50773/`_servername_`:`_namespace_`?token=1` when prompted. Replace _servername_ with the name of the Server Manager definition you previously created. Replace _namespace_ with the target namespace on that server. Do not omit the colon between these two elements. For example `http://localhost:50773/iris231:USER?token=1`
-9. On the next prompt ("Change Server Display Name") enter a suitable name, for example `IRIS231 USER`. Don't leave this blank, else the display name will default to `localhost`, meaning you won't be able to distinguish between entries you create for different **_servername_:_namespace_** combinations. 
-10. When you connect to a namespace for the first time you will be asked to allow the installation of a support class named `PolyglotKernel.CodeExecutor`. Choose `Yes`.
+5. Click the button in the upper right of the notebook captioned `Detecting Kernels` or `Select Kernel`.
+6. If the next picker is titled 'Select Kernel' choose `IRIS Notebook Servers...`. Otherwise choose `Select Another Kernel...`, then choose `IRIS Notebook Servers...` from that picker.
+7. The first time you use the extension you will be taken directly to the next step below (#8). On subsequent uses you are asked to "Select a Jupyter Server" and can pick a previously-used _server:NAMESPACE_ entry, then proceed at step #11 below. Alternatively choose `Add IRIS Notebook Host...` and proceed at step #8.
+8. On the "Choose IRIS Server" quickpick, choose your target.
+9. On the next quickpick choose your target namespace.
+10. When you connect a notebook to a namespace for the first time you will be asked to allow the installation of a support class named `PolyglotKernel.CodeExecutor`. Choose `Yes`.
 > **Tip:** To avoid having to load this class into other namespaces on the same server you can add a %ALL package mapping of the `PolyglotKernel` package to the default code database of the namespace you initially connected to.
 11. On the kernel selector, choose the `IRIS ObjectScript INT` kernel.
 12. The kernel indicator in the upper right of the notebook will display your choice, and the initial notebook cell will show the corresponding language (ObjectScript INT) in the lower right corner.
@@ -44,29 +44,34 @@ print('Hello world')
 	
 > **Note:** Cells of a Polyglot IRIS notebook are not language-aware, so they lack syntax coloring, completions etc. The so-called 'cell magics' tell the server-side code executor class which language to run, but the Jupyter notebook extension is not currently able to use them to vary the cell language in the editor.
 
-## Use With `objectscript.conn`
-
-If you already use the `objectscript.conn` settings object to connect VS Code to your IRIS server, you can reference that connection definition in your Jupyter Server URL.
-
-- Enter `http://localhost:50773/:?token=1` to connect to the namespace set in the `ns` property of your `objectscript.conn` settings object.
-- Enter `http://localhost:50773/:`_namespace_`?token=1` to connect to a different namespace.
-
-Your `objectscript.conn` must have one of the following formats:
-- `{ "active": true, "host": "xxx", "port": nn, "username": "uuu", "password": "***", "ns": "YYY" }`
-- `{ "active": true, "server": "xxx", "ns": "YYY" }`
-
-The first format requires a password to be stored as plaintext. The second format avoids this risk by leveraging Server Manager's secure credential storage.
-
-Both formats may optionally specify `"https": true`.
-
 ## Other Resources
 
 The [Jupyter PowerToys](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.vscode-jupyter-powertoys) extension adds a Kernels view to a dedicated Jupyter view container. Access this from its activity bar icon to explore remote servers, kernelspecs and active kernels (sessions).
 
+## Configuration Settings
+The optional `iris-jupyter-server.port` setting defines the local port to listen on. Default is 50773.
+
+The `iris-jupyter-server.hosts` settings object contains the _server:NAMESPACE_ entries that you defined as you connected for the first time.
+
+For example:
+
+```json
+	"iris-jupyter-server.hosts": {
+		"irislatest:USER": {
+			"enabled": true
+		},
+		"iris231:USER": {
+			"enabled": true
+		},
+		"doh-vvm:USER": {
+			"enabled": true
+		}
+	},
+```
+
 ## Known Issues
 
 1. The InterSystems IRIS Node Native API connectivity we use operates only in synchronous mode. Consequently the output from a long-running cell does not stream, so you have to wait for all the work to complete before you see any results for the cell.
-2. The Jupyter Server proxy launched by the extension always listens on port 50773.
 
 ## Feedback
 

@@ -5,21 +5,21 @@
 // the target is a Jupyter Hub. See https://github.com/microsoft/vscode-jupyter/blob/d52654ed850fba4ff241b4aa2e9f62cb082b3f71/src/kernels/jupyter/launcher/jupyterPasswordConnect.ts#L412-L419
 
 import * as vscode from 'vscode';
-import { FastifyInstance, FastifyRequest, RequestGenericInterface, RouteGenericInterface } from 'fastify';
+import { FastifyInstance, FastifyRequest, RequestGenericInterface } from 'fastify';
 import { IRISConnection } from './iris';
 import * as serverManager from '@intersystems-community/intersystems-servermanager';
-import { IServerSpec, Server } from './server';
 import { ServerNamespaceMgr } from './serverNamespaceMgr';
 import { JupyterServerAPI } from './jupyterServerAPI';
 import { logoutREST, makeRESTRequest } from './makeRESTRequest';
 import { extensionUri, logChannel } from './extension';
 import { Mutex } from 'async-mutex';
+import { Server } from './server';
 
 // Our interfaces
 export interface ITarget {
 	server: string,
 	namespace: string,
-	serverSpec?: IServerSpec
+	serverSpec?: serverManager.IServerSpec
 }
 
 export interface IProcess extends JupyterServerAPI.IKernel {
@@ -28,24 +28,17 @@ export interface IProcess extends JupyterServerAPI.IKernel {
 	executionCount: number
 }
 
-export interface IRouteGeneric extends RouteGenericInterface {
-	Params: {
-		serverNamespace: string // server:namespace
-	},
-
-	Body: string
+export interface IParams {
+	serverNamespace: string // server:namespace
 }
 
 export interface IRequestGeneric extends RequestGenericInterface {
-	Params: {
-		serverNamespace: string // server:namespace
-	},
-
+	Params: IParams,
 	Body: string
 }
 
 // The Server Manager API handle
-let serverManagerApi: any;
+let serverManagerApi:  serverManager.ServerManagerAPI;
 
 export abstract class ApiBase {
 
@@ -58,7 +51,7 @@ export abstract class ApiBase {
 				return serverNamespaceMgr.target;
 			}
 
-			const loadAndCompile = (async (serverSpec: IServerSpec, namespace: string): Promise<void> => {
+			const loadAndCompile = (async (serverSpec: serverManager.IServerSpec, namespace: string): Promise<void> => {
 				const fileUri = vscode.Uri.joinPath(extensionUri, 'server/src/PolyglotKernel/CodeExecutor.cls');
 				const name = 'PolyglotKernel.CodeExecutor.cls';
 				const content = (await vscode.workspace.fs.readFile(fileUri)).toString().split('\n').map((line) => line.replace('\r', ''));
@@ -93,8 +86,51 @@ export abstract class ApiBase {
 
 				let serverName = parts[0].toLowerCase();
 				let namespace = parts[1].toUpperCase();
+
+				// Check existence of server-side support class, and install it if absent
+				const checkNamespace = (async (serverSpec: serverManager.IServerSpec) => {
+					const runQuery = ((serverSpec: serverManager.IServerSpec) => {
+						return makeRESTRequest(
+							'POST',
+							serverSpec,
+							{ apiVersion: 1, namespace, path: '/action/query' },
+							{ query: 'SELECT PolyglotKernel.CodeExecutor_HostName() AS Host, PolyglotKernel.CodeExecutor_SuperServerPort() AS Port', parameters: [] }
+						);
+					});
+					try {
+						let response = await runQuery(serverSpec);
+						if (response !== undefined) {
+							if (response.data.result.content === undefined) {
+								if (response.data.status?.errors[0]?.code !== 5540) {
+									throw new Error(response.data.status.summary);
+								}
+								// Class is missing, so load and compile it, then re-run the query
+								const choice = await vscode.window.showInformationMessage(`Polyglot.CodeExecutor class not found in ${serverSpec.name}:${namespace}. Load it now?`, { modal: true }, { title: 'Yes' }, { title: 'No', isCloseAffordance: true });
+								if (choice?.title !== 'Yes') {
+									throw new Error('Polyglot.CodeExecutor class not available');
+								}
+								await loadAndCompile(serverSpec, namespace);
+								response = await runQuery(serverSpec);
+								if (response?.data.result.content === undefined) {
+									throw new Error(`Retry failed after class load: ${response?.data.status.summary ?? 'Unknown'}`);
+								}
+							}
+							const host = serverSpec.superServer?.host ?? response.data.result.content[0].Host;
+							const port = serverSpec.superServer?.port ?? response.data.result.content[0].Port;
+							serverSpec.superServer = { host, port };
+						}
+					} catch (error) {
+						throw error;
+					} finally {
+						await logoutREST(serverSpec);
+					}
+				});
+
 				let serverSpec = Server.get(serverName);
 				if (serverSpec) {
+					if (!ServerNamespaceMgr.get(serverNamespace)) {
+						await checkNamespace(serverSpec);
+					}
 					return { server: serverName, namespace, serverSpec };
 				}
 				if (serverName === '') {
@@ -108,7 +144,7 @@ export abstract class ApiBase {
 						  await targetExtension.activate();
 						}
 						const api = targetExtension.exports;
-					
+
 						if (!api) {
 						  return undefined;
 						}
@@ -160,15 +196,16 @@ export abstract class ApiBase {
 						}
 						serverManagerApi = extension.exports;
 					}
-					serverSpec = await serverManagerApi.getServerSpec(serverName) as serverManager.IServerSpec;
+					serverSpec = await serverManagerApi.getServerSpec(serverName);
 					if (!serverSpec) {
 						return { server: serverName, namespace };
 					}
 					if (typeof serverSpec.password === 'undefined') {
 						const scopes = [serverSpec.name, serverSpec.username || ''];
-						let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true });
+						const account = serverManagerApi.getAccount(serverSpec);
+						let session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { silent: true, account });
 						if (!session) {
-							session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true });
+							session = await vscode.authentication.getSession(serverManager.AUTHENTICATION_PROVIDER, scopes, { createIfNone: true, account });
 						}
 						if (session) {
 							serverSpec.username = session.scopes[1];
@@ -181,44 +218,11 @@ export abstract class ApiBase {
 				}
 
 				// Check existence of server-side support class, and install it if absent
-				const runQuery = ((serverSpec: IServerSpec) => {
-					return makeRESTRequest(
-						'POST',
-						serverSpec,
-						{ apiVersion: 1, namespace, path: '/action/query' },
-						{ query: 'SELECT PolyglotKernel.CodeExecutor_HostName() AS Host, PolyglotKernel.CodeExecutor_SuperServerPort() AS Port', parameters: [] }
-					);
-				});
-				try {
-					let response = await runQuery(serverSpec);
-					if (response !== undefined) {
-						if (response.data.result.content === undefined) {
-							if (response.data.status?.errors[0]?.code !== 5540) {
-								throw new Error(response.data.status.summary);
-							}
-							// Class is missing, so load and compile it, then re-run the query
-							const choice = await vscode.window.showInformationMessage(`Polyglot.CodeExecutor class not found in ${serverSpec.name}:${namespace}. Load it now?`, { modal: true }, { title: 'Yes' }, { title: 'No', isCloseAffordance: true });
-							if (choice?.title !== 'Yes') {
-								throw new Error('Polyglot.CodeExecutor class not available');
-							}
-							await loadAndCompile(serverSpec, namespace);
-							response = await runQuery(serverSpec);
-							if (response?.data.result.content === undefined) {
-								throw new Error(`Retry failed after class load: ${response?.data.status.summary ?? 'Unknown'}`);
-							}
-						}
-						const host = serverSpec.superServer?.host ?? response.data.result.content[0].Host;
-						const port = serverSpec.superServer?.port ?? response.data.result.content[0].Port;
-						serverSpec.superServer = { host, port };
-					}
-				} catch (error) {
-					throw error;
-				} finally {
-					await logoutREST(serverSpec);
-				}
+				await checkNamespace(serverSpec);
 
 				return { server: serverName, namespace, serverSpec };
 			});
+
 			const target = await resolveTarget();
 			if (target.serverSpec) {
 				if (!Server.get(serverNamespace)) {
@@ -237,7 +241,7 @@ export abstract class ApiBase {
 
 export class MiscApi extends ApiBase {
 
-	static addRoutes(fastify:FastifyInstance) {
+	static addRoutes(fastify: FastifyInstance) {
 
 		fastify.get('/:serverNamespace/hub/api', (request: FastifyRequest<IRequestGeneric>, reply) => {
 			const { serverNamespace } = request.params;

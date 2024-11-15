@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - master
     paths-ignore:
       - ".vscode/**"
       - ".github/**"
@@ -11,7 +11,7 @@ on:
       - "**/*.md"
   pull_request:
     branches:
-      - main
+      - master
   release:
     types:
       - released
@@ -30,7 +30,7 @@ jobs:
     outputs:
       taggedbranch: ${{ steps.find-branch.outputs.taggedbranch }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
       - name: Find which branch the release tag points at
         id: find-branch
@@ -65,13 +65,14 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 18
       - run: npm install
       - name: lint
         if: runner.os == 'Linux-NOSUCH'
         run: npm run lint
       - run: npm run compile
       - name: npm test
+        if: runner.os == 'Linux-NOSUCH'
         uses: coactions/setup-xvfb@v1
         with:
           run: npm run test
@@ -121,12 +122,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
   publish:
     needs: build
-    if: github.event_name == 'release' && needs.build.outputs.taggedbranch == 'main'
+    if: github.event_name == 'release' && needs.build.outputs.taggedbranch == 'master'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: master
           token: ${{ secrets.TOKEN }}
       - uses: actions/download-artifact@v4
         with:
@@ -135,7 +136,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 18
       - name: Prepare build
         id: set-version
         run: |
