@@ -49,7 +49,9 @@ print('Hello world')
 The [Jupyter PowerToys](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.vscode-jupyter-powertoys) extension adds a Kernels view to a dedicated Jupyter view container. Access this from its activity bar icon to explore remote servers, kernelspecs and active kernels (sessions).
 
 ## Configuration Settings
-The `iris-jupyter-server.hosts` object in your settings file contains the _server:NAMESPACE_ entries that you defined as you connected for the first time.
+The optional `iris-jupyter-server.port` setting defines the local port to listen on. Default is 50773.
+
+The `iris-jupyter-server.hosts` settings object contains the _server:NAMESPACE_ entries that you defined as you connected for the first time.
 
 For example:
 
@@ -70,7 +72,6 @@ For example:
 ## Known Issues
 
 1. The InterSystems IRIS Node Native API connectivity we use operates only in synchronous mode. Consequently the output from a long-running cell does not stream, so you have to wait for all the work to complete before you see any results for the cell.
-2. The Jupyter Server proxy launched by the extension always listens on port 50773. If this port is unavailable it will fail to start.
 
 ## Feedback
 

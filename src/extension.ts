@@ -77,17 +77,17 @@ export async function activate(context: vscode.ExtensionContext) {
 	});
 
 	// Run the server, listening only on loopback interface
+	const proxyPort = vscode.workspace.getConfiguration('iris-jupyter-server').get<number>('port') || 50773;
 	const started = await new Promise<boolean>(async (resolve) => {
-		const port = 50773;
 		const displayName = context.extension.packageJSON.displayName;
 		try {
-			await fastify.listen({ port });
-			logChannel.info(`${displayName} is listening on local port ${port}`);
+			await fastify.listen({ port: proxyPort });
+			logChannel.info(`${displayName} is listening on local port ${proxyPort}`);
 			resolve(true);
 		} catch (err) {
 			fastify.log.error(err);
 			logChannel.error(err as Error);
-			vscode.window.showErrorMessage(`Failed to start ${displayName} on local port ${port} (${(err as Error).message})`);
+			vscode.window.showErrorMessage(`Failed to start ${displayName} on local port ${proxyPort} (${(err as Error).message})`);
 			resolve(false);
 		}
 	});
@@ -317,7 +317,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			id: `${context.extension.id}:${serverNamespace}`,
 			label: label ?? serverNamespace,
 			connectionInformation: {
-				baseUrl: vscode.Uri.parse(`http://localhost:50773/${serverNamespace}`),
+				baseUrl: vscode.Uri.parse(`http://localhost:${proxyPort}/${serverNamespace}`),
 				token: '1',
 			},
 		};
