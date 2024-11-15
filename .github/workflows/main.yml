@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - master
     paths-ignore:
       - ".vscode/**"
       - ".github/**"
@@ -11,7 +11,7 @@ on:
       - "**/*.md"
   pull_request:
     branches:
-      - main
+      - master
   release:
     types:
       - released
@@ -121,12 +121,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
   publish:
     needs: build
-    if: github.event_name == 'release' && needs.build.outputs.taggedbranch == 'main'
+    if: github.event_name == 'release' && needs.build.outputs.taggedbranch == 'master'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: main
+          ref: master
           token: ${{ secrets.TOKEN }}
       - uses: actions/download-artifact@v4
         with:
