@@ -55,7 +55,7 @@
       "properties": {
         "iris-jupyter-server.port": {
           "type": "number",
-          "markdownDescription": "Local port to use for running Jupyter notebooks on InterSystems IRIS servers. Restart the extension after changing this setting.",
+          "markdownDescription": "Local port to use for running Jupyter notebooks on InterSystems IRIS servers. Restart the extension after you change this setting.",
           "scope": "window",
           "default": 50773
         },
