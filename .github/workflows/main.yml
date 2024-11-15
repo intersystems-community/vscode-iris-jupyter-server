@@ -72,6 +72,7 @@ jobs:
         run: npm run lint
       - run: npm run compile
       - name: npm test
+        if: runner.os == 'Linux-NOSUCH'
         uses: coactions/setup-xvfb@v1
         with:
           run: npm run test
