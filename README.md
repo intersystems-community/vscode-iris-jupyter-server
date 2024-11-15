@@ -1,6 +1,6 @@
 # intersystems-community.iris-jupyter-server
 
-This VS Code extension is an alpha-quality proof of concept. It leverages [Microsoft's Jupyter extension](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter) to bring the notebook paradigm to developers working with InterSystems IRIS servers, both local and remote.
+This VS Code extension leverages [Microsoft's Jupyter extension](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter) to bring the notebook paradigm to developers working with InterSystems IRIS servers, both local and remote.
 
 ## Getting Started
 
@@ -9,12 +9,19 @@ This VS Code extension is an alpha-quality proof of concept. It leverages [Micro
 > **Note:** IRIS developers who already use the `objectscript.conn` settings object and don't want to adopt Server Manager should consult a later section of this document for information applicable to them.
 3. From VS Code's `File` menu select `New File...`. This option is also available on the Welcome page.
 4. When a quickpick appears, choose `Jupyter Notebook`.
-5. Click the `Detecting Kernels` button in the upper right of the notebook.
-6. In the quickpick titled "Select Kernel" choose `Existing Jupyter Server...`.
-7. In the next quickpick ("Select a Jupyter Server") choose `Enter the URL of the running Jupyter server`.
-8. Enter `http://localhost:50773/`_servername_`:`_namespace_`?token=1` when prompted. Replace _servername_ with the name of the Server Manager definition you previously created. Replace _namespace_ with the target namespace on that server. Do not omit the colon between these two elements. For example `http://localhost:50773/iris231:USER?token=1`
-9. On the next prompt ("Change Server Display Name") enter a suitable name, for example `IRIS231 USER`. Don't leave this blank, else the display name will default to `localhost`, meaning you won't be able to distinguish between entries you create for different **_servername_:_namespace_** combinations. 
-10. When you connect to a namespace for the first time you will be asked to allow the installation of a support class named `PolyglotKernel.CodeExecutor`. Choose `Yes`.
+5. Click the button in the upper right of the notebook captioned `Detecting Kernels` or `Select Kernel`.
+6. If the next picker is titled 'Select Kernel' choose `IRIS Notebook Servers...`. Otherwise choose `Select Another Kernel...`, then choose `IRIS Notebook Servers...` from that picker.
+7. In the next quickpick ("Select a Jupyter Server") choose `Add IRIS Notebook Host...`.
+8. The next quickpick ("Choose IRIS Server"), pick your target.
+> **Note:** If your target is missing from the list, do the following:
+> - Open your `settings.json` file. One way is to run `Preferences: Open User Settings (JSON)` from Command Palette.
+> - Add the `superServer` property to the server's definition within the `intersystems.servers` settings object.
+> - The `superServer` property is an object with a required `port` property. The default superserver port for an IRIS instance is 1972. Change this if necessary.
+> - If your target's `webServer` property's `host` property doesn't point to the IRIS instance's host but instead to a separate web server then you must also name the IRIS host in the optional `host` property of `superServer`.
+>
+> Go back to step 5 above.
+9. On the next quickpick choose your target namespace.
+10. When you connect a notebook to a namespace for the first time you will be asked to allow the installation of a support class named `PolyglotKernel.CodeExecutor`. Choose `Yes`.
 > **Tip:** To avoid having to load this class into other namespaces on the same server you can add a %ALL package mapping of the `PolyglotKernel` package to the default code database of the namespace you initially connected to.
 11. On the kernel selector, choose the `IRIS ObjectScript INT` kernel.
 12. The kernel indicator in the upper right of the notebook will display your choice, and the initial notebook cell will show the corresponding language (ObjectScript INT) in the lower right corner.
