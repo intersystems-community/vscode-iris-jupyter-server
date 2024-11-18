@@ -23,10 +23,30 @@ concurrency:
 jobs:
   build:
     timeout-minutes: 10
-    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        include:
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            npm_config_arch: x64
+            ISC_PLATFORM: winx64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            npm_config_arch: x64
+            ISC_PLATFORM: lnxubuntux64
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+            npm_config_arch: x64
+            ISC_PLATFORM: macx64
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            npm_config_arch: arm64
+            ISC_PLATFORM: macos
+    runs-on: ${{ matrix.os }}
     outputs:
       taggedbranch: ${{ steps.find-branch.outputs.taggedbranch }}
     steps:
@@ -43,9 +63,9 @@ jobs:
           echo "taggedbranch=$TAGGEDBRANCH" >> $GITHUB_OUTPUT
       - name: Set an output
         id: set-version
-        if: runner.os == 'Linux'
         run: |
           set -x
+          echo "target=${{ matrix.platform }}-${{ matrix.arch }}" >> $env:GITHUB_ENV
           VERSION=$(jq -r '.version' package.json | cut -d- -f1)
           [ $GITHUB_EVENT_NAME == 'release' ] && VERSION=${{ github.event.release.tag_name }} && VERSION=${VERSION/v/}
           CHANGELOG=$(cat CHANGELOG.md | sed -n "/## \[${VERSION}\]/,/## /p" | sed '/^$/d;1d;$d')
@@ -55,7 +75,7 @@ jobs:
           [ $GITHUB_EVENT_NAME == 'push' ] && VERSION+=-beta && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f4)+1))
           [ $GITHUB_EVENT_NAME == 'pull_request' ] && VERSION+=-dev.${{ github.event.pull_request.number }}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          NAME=$(jq -r '.name' package.json)-$VERSION
+          NAME=$(jq -r '.name' package.json)-${{ matrix.platform }}-${{ matrix.arch }}-$VERSION
           echo "name=$NAME" >> $GITHUB_OUTPUT
           tmp=$(mktemp)
           jq --arg version "$VERSION" '.version = $version' package.json > "$tmp" && mv "$tmp" package.json
@@ -68,25 +88,25 @@ jobs:
           node-version: 18
       - run: npm install
       - name: lint
-        if: runner.os == 'Linux-NOSUCH'
+        if: runner.os == 'Linux-IGNORE'
         run: npm run lint
       - run: npm run compile
       - name: npm test
-        if: runner.os == 'Linux-NOSUCH'
+        if: runner.os == 'Linux-IGNORE'
         uses: coactions/setup-xvfb@v1
         with:
           run: npm run test
       - name: Build package
-        if: runner.os == 'Linux'
         run: |
-          npx vsce package -o ${{ steps.set-version.outputs.name }}.vsix
+          node -e "require('fs').cpSync('./intersystems-iris-native/bin/${{ matrix.ISC_PLATFORM }}/', './dist/', { recursive: true, filter: (f) => !f.endsWith('irisnative.node') })"
+          npx vsce package --target ${{ env.target }} -o ${{ steps.set-version.outputs.name }}.vsix
       - uses: actions/upload-artifact@v4
-        if: (runner.os == 'Linux') && (github.event_name != 'release')
+        if: (github.event_name != 'release')
         with:
           name: ${{ steps.set-version.outputs.name }}.vsix
           path: ${{ steps.set-version.outputs.name }}.vsix
       - uses: actions/upload-artifact@v4
-        if: runner.os == 'Linux'
+        # if: runner.os == 'Linux'
         with:
           name: meta
           path: |
@@ -103,7 +123,7 @@ jobs:
           path: .
       - name: Set an output
         id: set-version
-        if: runner.os == 'Linux'
+        if: runner.os == 'LinuxTODO'
         run: |
           set -x
           echo "version=`cat meta.version`" >> $GITHUB_OUTPUT
@@ -159,7 +179,7 @@ jobs:
       - name: Upload Release Asset
         id: upload-release-asset
         uses: softprops/action-gh-release@v1
-        if: runner.os == 'Linux'
+        if: runner.os == 'LinuxTODO'
         with:
           tag_name: ${{ github.event.release.tag_name }}
           files: ${{ steps.set-version.outputs.name }}.vsix
