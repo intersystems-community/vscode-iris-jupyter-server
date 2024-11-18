@@ -52,7 +52,6 @@ jobs:
           echo "taggedbranch=$TAGGEDBRANCH" >> $GITHUB_OUTPUT
       - name: Set package name and version
         id: set-version
-        shell: pwsh
         run: |
           set -x
           VERSION=$(jq -r '.version' package.json | cut -d- -f1)
