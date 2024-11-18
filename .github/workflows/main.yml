@@ -55,7 +55,7 @@ jobs:
       - name: Find which branch the release tag points at
         id: find-branch
         if: github.event_name == 'release' && runner.os == 'Linux'
-        shell: bash
+        shell: pwsh
         run: |
           git fetch --depth=1 origin +refs/heads/*:refs/heads/*
           set -x
