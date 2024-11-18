@@ -65,7 +65,6 @@ jobs:
         id: set-version
         run: |
           set -x
-          echo "target=${{ matrix.platform }}-${{ matrix.arch }}" >> $env:GITHUB_ENV
           VERSION=$(jq -r '.version' package.json | cut -d- -f1)
           [ $GITHUB_EVENT_NAME == 'release' ] && VERSION=${{ github.event.release.tag_name }} && VERSION=${VERSION/v/}
           CHANGELOG=$(cat CHANGELOG.md | sed -n "/## \[${VERSION}\]/,/## /p" | sed '/^$/d;1d;$d')
@@ -99,7 +98,7 @@ jobs:
       - name: Build package
         run: |
           node -e "require('fs').cpSync('./intersystems-iris-native/bin/${{ matrix.ISC_PLATFORM }}/', './dist/', { recursive: true, filter: (f) => !f.endsWith('irisnative.node') })"
-          npx vsce package --target ${{ env.target }} -o ${{ steps.set-version.outputs.name }}.vsix
+          npx vsce package --target ${{ matrix.platform }}-${{ matrix.arch }} -o ${{ steps.set-version.outputs.name }}.vsix
       - uses: actions/upload-artifact@v4
         if: (github.event_name != 'release')
         with:
