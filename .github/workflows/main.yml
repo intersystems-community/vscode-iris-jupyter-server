@@ -22,8 +22,8 @@ concurrency:
 
 jobs:
   build:
-    timeout-minutes: 10
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       matrix:
         include:
@@ -127,16 +127,48 @@ jobs:
           prerelease: ${{ github.event_name != 'release' }}
           files: '**/*.vsix'
           token: ${{ secrets.GITHUB_TOKEN }}
+  
   publish:
-    needs: build
-    if: github.event_name == 'release' && needs.build.outputs.taggedbranch == 'master'
     runs-on: ubuntu-latest
+    needs: build
+    if: success() && github.event_name == 'release'
     steps:
-      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm install -g @vscode/vsce
+      - name: Download packages
+        uses: actions/download-artifact@v4
+      - name: Attach packages to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: '**/*.vsix'
+          body: See CHANGELOG for details
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+        if: env.VSCE_PAT != null
+        run: vsce publish --packagePath $(find . -iname "*.vsix" -type f)
+      - name: Publish to Open VSX Registry
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_TOKEN }}
+        if: env.OVSX_PAT != null
+        timeout-minutes: 5
+        run: find . -iname "*.vsix" -type f -exec npx ovsx publish {} \;
+  bump_version:
+    runs-on: ubuntu-latest
+    needs: [build, publish]
+    if: github.event_name == 'release'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
         with:
           ref: master
-          token: ${{ secrets.TOKEN }}
-      - uses: actions/download-artifact@v4
+      - name: Download metadata
+        uses: actions/download-artifact@v4
         with:
           name: meta
           path: .
@@ -144,34 +176,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-      - name: Prepare build
-        id: set-version
+      - name: Create commit
         run: |
           VERSION=`cat meta.version`
           NEXT_VERSION=`cat meta.version | awk -F. '/[0-9]+\./{$NF++;print}' OFS=.`
-          echo "name=`cat meta.name`" >> $GITHUB_OUTPUT
           tmp=$(mktemp)
           git config --global user.name 'ProjectBot'
           git config --global user.email 'bot@users.noreply.github.com'
           jq --arg version "${NEXT_VERSION}-SNAPSHOT" '.version = $version' package.json > "$tmp" && mv "$tmp" package.json
           git add package.json
-          git commit -m 'auto bump version with release'
-          jq --arg version "$VERSION" '.version = $version' package.json > "$tmp" && mv "$tmp" package.json
-          npm install
-          jq 'del(.enableProposedApi,.enabledApiProposals)' package.json > "$tmp" && mv "$tmp" package.json
+          git commit -m 'auto bump version with release [skip ci]'
           git push
-      - name: Build package
-        run: |
-          npx vsce package -o ${{ steps.set-version.outputs.name }}.vsix
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: softprops/action-gh-release@v1
-        if: runner.os == 'LinuxTODO'
-        with:
-          tag_name: ${{ github.event.release.tag_name }}
-          files: ${{ steps.set-version.outputs.name }}.vsix
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish to VSCode Marketplace
-        run: |
-          [ -n "${{ secrets.VSCE_TOKEN }}" ] && \
-            npx vsce publish --packagePath ${{ steps.set-version.outputs.name }}.vsix -p ${{ secrets.VSCE_TOKEN }} || true
