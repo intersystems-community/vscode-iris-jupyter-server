@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { FastifyInstance, FastifyRequest } from "fastify";
 import { ApiBase, IRequestGeneric } from "../api";
 import { logChannel } from "../extension";

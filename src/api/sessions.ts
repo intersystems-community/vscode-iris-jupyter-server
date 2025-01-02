@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { FastifyInstance, FastifyRequest } from "fastify";
-import { ApiBase, IRequestGeneric } from "../api";
+import { ApiBase, IRequestGeneric, IParams } from "../api";
 import { JupyterServerAPI } from "../jupyterServerAPI";
 import { ServerNamespaceMgr } from "../serverNamespaceMgr";
 import { IRISConnection } from '../iris';
@@ -30,6 +31,7 @@ export class SessionsApi extends ApiBase {
 				return {};
 			}
 			const target = serverNamespaceMgr.target;
+
 			var session: JupyterServerAPI.ISession;
 			try {
 				session = JSON.parse(request.body);
@@ -38,7 +40,7 @@ export class SessionsApi extends ApiBase {
 				reply.code(400);
 				return {};
 			}
-			const { name, type, path, kernel } = session;
+			const { name, kernel } = session;
 
 			const existingSession = serverNamespaceMgr?.getSession(name);
 			if (existingSession) {

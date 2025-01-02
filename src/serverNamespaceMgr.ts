@@ -31,12 +31,12 @@ export class ServerNamespaceMgr extends Disposable {
 		return Array.from<JupyterServerAPI.IKernel>(this._augmentedKernelMap.values());
 	}
 
-	getKernel(id: string): JupyterServerAPI.IKernel | undefined {
-		return this._augmentedKernelMap.get(id);
+	getKernel(kernelId: string): JupyterServerAPI.IKernel | undefined {
+		return this._augmentedKernelMap.get(kernelId);
 	}
 
-	getProcess(id: string): IProcess | undefined {
-		return this._augmentedKernelMap.get(id);
+	getProcess(kernelId: string): IProcess | undefined {
+		return this._augmentedKernelMap.get(kernelId);
 	}
 
 	allSessions(): JupyterServerAPI.ISession[] {
@@ -58,6 +58,20 @@ export class ServerNamespaceMgr extends Disposable {
 		this._sessionMap.set(session.name, session);
 		this._augmentedKernelMap.set(session.kernel.id, { ...session.kernel, connection, sessionName: session.name, executionCount: 0 });
 		return session;
+	}
+
+	deleteKernel(kernelId: string) {
+		logChannel.debug(`ServerNamespaceMgr: delete kernel ${kernelId}`);
+
+		const process = this._augmentedKernelMap.get(kernelId);
+		if (!process) {
+			return;
+		}
+
+		process.connection.dispose();
+		const sessionName = process.sessionName;
+		this._sessionMap.delete(sessionName);
+		this._augmentedKernelMap.delete(kernelId);
 	}
 
 	restartKernel(kernelId: string): string {

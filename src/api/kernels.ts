@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { FastifyInstance, FastifyRequest } from "fastify";
 import * as FastifyWS from "@fastify/websocket";
 import * as nteract from "@nteract/messaging";
-import { ApiBase, IRequestGeneric, IRouteGeneric } from "../api";
+import { ApiBase, IRequestGeneric } from "../api";
 import { JupyterServerAPI } from "../jupyterServerAPI";
 import { ServerNamespaceMgr } from "../serverNamespaceMgr";
 import console = require("console");
@@ -70,18 +71,29 @@ export class KernelsApi extends ApiBase {
 			// TODO
 			const serverNamespace = request.params.serverNamespace;
 			const kernelId = request.params.kernelId;
-			const kernel = ServerNamespaceMgr.get(serverNamespace)?.getKernel(kernelId);
-			if (!kernel) {
+			const mgr = ServerNamespaceMgr.get(serverNamespace);
+			if (!mgr) {
 				reply.code(404);
-				return;
+				return {};
+			}
+			const kernel = mgr.getKernel(kernelId);
+			const process = mgr.getProcess(kernelId);
+			if (!kernel || !process) {
+				// Nothing to do
+				reply.code(204);
+				return {};
 			}
 
-			//TODO Delete
-			reply.code(404);
-			return;
-
-			reply.code(204);
-			return kernel;
+			const jobNumber = process.connection.iris.classMethodValue('%SYSTEM.SYS', 'ProcessID');
+			const result = process.connection.iris.classMethodValue('%SYSTEM.Process', 'Terminate', jobNumber);
+			if (result === 1) {
+				reply.code(204);
+				mgr.deleteKernel(kernelId);
+			}
+			else {
+				reply.code(404);
+			}
+			return {};
 		});
 
 		fastify.post('/:serverNamespace/api/kernels/:kernelId/interrupt', (request: FastifyRequest<IRequestKernel>, reply) => {
@@ -92,7 +104,7 @@ export class KernelsApi extends ApiBase {
 			const process = ServerNamespaceMgr.get(serverNamespace)?.getProcess(kernelId);
 			if (!process) {
 				reply.code(404);
-				return;
+				return {};
 			}
 
 			//TODO - Blocked by Node.js Native API not being async
@@ -100,11 +112,12 @@ export class KernelsApi extends ApiBase {
 			const result = process.connection.iris.classMethodValue('%SYSTEM.Process', 'Terminate', jobNumber);
 			if (result === 1) {
 				reply.code(204);
+				ServerNamespaceMgr.get(serverNamespace)?.deleteKernel(kernelId);
 			}
 			else {
 				reply.code(404);
 			}
-			return;
+			return {};
 		});
 
 		fastify.post('/:serverNamespace/api/kernels/:kernelId/restart', (request: FastifyRequest<IRequestKernel>, reply) => {
@@ -131,7 +144,7 @@ export class KernelsApi extends ApiBase {
 		// Provides https://jupyter-client.readthedocs.io/en/stable/messaging.html as JSON over a websocket
 		fastify.get('/:serverNamespace/api/kernels/:kernelId/channels',
 			{ websocket: true },
-			(connection: FastifyWS.SocketStream, request: FastifyRequest<IRequestChannels>) => {
+			(socket: FastifyWS.WebSocket, request: FastifyRequest<IRequestChannels>) => {
 				const serverNamespace = request.params.serverNamespace;
 				const kernelId = request.params.kernelId;
 				const clientSessionId = request.query.session_id;
@@ -141,17 +154,90 @@ export class KernelsApi extends ApiBase {
 				// servicing kernelId restarts, because the kernelId won't change but the session property of the header object within its messages must change.
 				const kernelSessionId = kernelId;
 
-				connection.socket.on('message', (rawData) => {
-					logChannel.debug(`WS message arrived: ${rawData.toString('utf8')}`);
-					let message: nteract.JupyterMessage = JSON.parse(rawData.toString('utf8'));
+				socket.on('message', (rawData: any) => {
+					const rawBuffer = Buffer.from(rawData);
+					// See https://jupyter-server.readthedocs.io/en/latest/developers/websocket-protocols.html#v1-kernel-websocket-jupyter-org-protocol
+					const offsetCount = rawBuffer.readUInt32LE(0);
+					const offsets: number[] = [];
+					for (let i = 1; i <= offsetCount; i ++) {
+						offsets.push(rawBuffer.readUInt32LE(i * 8));
+					}
+					const buffers: Buffer[] = [];
+					for (let i = 5; i < (offsetCount - 1); i ++) {
+						const start = offsets[i];
+						const end = offsets[i + 1];
+						buffers.push(rawBuffer.slice(start, end));
+					}
+					let messageObj: nteract.JupyterMessage = {
+						channel: rawBuffer.toString('utf8', offsets[0], offsets[1]),
+						header: JSON.parse(rawBuffer.toString('utf8', offsets[1], offsets[2])),
+						parent_header: JSON.parse(rawBuffer.toString('utf8', offsets[2], offsets[3])),
+						metadata: JSON.parse(rawBuffer.toString('utf8', offsets[3], offsets[4])),
+						content: JSON.parse(rawBuffer.toString('utf8', offsets[4], offsets[5])),
+						buffers
+					};
+
+					const sendMessage = (msg: nteract.JupyterMessage, newStatus?: string) => {
+						const offsetCount = 6 + (msg.buffers?.length || 0);
+						const offsetsBuffer = Buffer.alloc((offsetCount + 1) * 8);
+						offsetsBuffer.writeUInt32LE(offsetCount, 0);
+						let offset = (offsetCount + 1) * 8;
+
+						let chunkNumber = 0;
+						let chunk = msg.channel;
+						let outString = chunk;
+						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+						offset += Buffer.byteLength(chunk);
+
+						chunk = JSON.stringify(msg.header);
+						outString += chunk;
+						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+						offset += Buffer.byteLength(chunk);
+
+						chunk = JSON.stringify(msg.parent_header);
+						outString += chunk;
+						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+						offset += Buffer.byteLength(chunk);
+
+						chunk = JSON.stringify(msg.metadata);
+						outString += chunk;
+						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+						offset += Buffer.byteLength(chunk);
+
+						chunk = JSON.stringify(msg.content);
+						outString += chunk;
+						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+						offset += Buffer.byteLength(chunk);
+
+						for (const buffer of msg.buffers || []) {
+							offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+							if (buffer instanceof ArrayBuffer) {
+								outString += buffer;
+								offset += buffer.byteLength;
+							} else {
+								outString += buffer.buffer;
+								offset += buffer.buffer.byteLength;
+							}
+						}
+
+						// The final offset is for an imaginary additional chunk
+						offsetsBuffer.writeUInt32LE(offset, ++chunkNumber * 8);
+
+						const outBuffer = Buffer.from(outString);
+
+						socket.send(Buffer.concat([offsetsBuffer, outBuffer]), () => {
+							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
+							if (newStatus) {
+								sendStatus(newStatus);
+							}
+						});
+					};
 
 					const sendStatus = (status: string) => {
-						const msg = nteract.createMessage('status', { parent_header: message.header, content: { 'execution_state': status } });
+						const msg = nteract.createMessage('status', { parent_header: messageObj.header, content: { 'execution_state': status } });
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
-						connection.socket.send(JSON.stringify(msg), () => {
-							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}, status ${status}: ${JSON.stringify(msg)}`);
-						});
+						sendMessage(msg);
 					};
 
 					const sendResult = (output: string, executionCount: number) => {
@@ -194,7 +280,7 @@ export class KernelsApi extends ApiBase {
 							}
 						}
 						const msg = nteract.createMessage('execute_result', {
-							parent_header: message.header,
+							parent_header: messageObj.header,
 							content: {
 								execution_count: executionCount,
 								data,
@@ -203,14 +289,12 @@ export class KernelsApi extends ApiBase {
 						});
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
-						connection.socket.send(JSON.stringify(msg), () => {
-							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
-						});
+						sendMessage(msg);
 					};
 
 					const sendError = (text: string) => {
 						const msg = nteract.createMessage('error', {
-							parent_header: message.header,
+							parent_header: messageObj.header,
 							content: {
 								ename: 'errName (does this appear?)',
 								evalue: 'error message (does this appear?)',
@@ -220,35 +304,30 @@ export class KernelsApi extends ApiBase {
 						});
 						msg.header.session = kernelSessionId;
 						msg.header.username = 'iris-jupyter-server';
-						connection.socket.send(JSON.stringify(msg), () => {
-							logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${msg.channel}, type ${msg.header.msg_type}: ${JSON.stringify(msg)}`);
-						});
+						sendMessage(msg);
 					};
 
 					/*
 					const broadcast = (msg: nteract.JupyterMessage) => {
 						const originalChannel = msg.channel;
 						msg.channel = 'iopub';
-						const outString = JSON.stringify(msg);
-						connection.socket.send(outString, () => {
-							logChannel.debug(` > kernel '${kernelId}' socket message was broadcast on IOPub: ${outString}`);
-						});
+						sendMessage(msg);
 						msg.channel = originalChannel;
 					};
 					*/
 
-					logChannel.debug(` < kernel '${kernelId}' socket message received, channel ${message.channel}, type ${message.header.msg_type} message=${JSON.stringify(message)}`);
+					logChannel.debug(` < kernel '${kernelId}' socket message received, channel ${messageObj.channel}, type ${messageObj.header.msg_type} message=${JSON.stringify(messageObj)}`);
 
 					sendStatus('busy');
 
-					//broadcast(message);
+					////broadcast(message);
 
 					let reply: any;
-					if (message.channel === 'shell') {
-						switch (message.header.msg_type) {
+					if (messageObj.channel === 'shell') {
+						switch (messageObj.header.msg_type) {
 							case 'kernel_info_request':
 								reply = nteract.createMessage('kernel_info_reply', {
-									parent_header: message.header,
+									parent_header: messageObj.header,
 									content: {
 										status: 'ok',
 										protocol_version: '5.2',
@@ -271,7 +350,7 @@ export class KernelsApi extends ApiBase {
 								if (!irisConn) {
 									sendError('No connection');
 									reply = nteract.createMessage('execute_reply', {
-										parent_header: message.header,
+										parent_header: messageObj.header,
 										content: {
 											'status': 'error',
 											'execution_count': 0
@@ -281,7 +360,7 @@ export class KernelsApi extends ApiBase {
 								}
 
 								let language = 'cos';
-								let code: string = message.content.code;
+								let code: string = messageObj.content.code;
 								switch (process.name) {
 									case 'iris-python':
 										language = 'python';
@@ -331,9 +410,7 @@ export class KernelsApi extends ApiBase {
 									inputMsg.header.session = kernelSessionId;
 									inputMsg.header.username = 'iris-jupyter-server';
 									inputMsg.parent_header = message.header;
-									connection.socket.send(JSON.stringify(inputMsg), () => {
-										logChannel.debug(` > kernel '${kernelId}' socket message sent, channel ${inputMsg.channel}, type ${inputMsg.header.msg_type}: ${JSON.stringify(inputMsg)}`);
-									});
+									sendMessage(inputMsg);
 								}
 								*/
 
@@ -342,7 +419,7 @@ export class KernelsApi extends ApiBase {
 								if (!result.status) {
 									sendError(result.out);
 									reply = nteract.createMessage('execute_reply', {
-										parent_header: message.header,
+										parent_header: messageObj.header,
 										content: {
 											status: 'error',
 											execution_count: ++process.executionCount
@@ -353,7 +430,7 @@ export class KernelsApi extends ApiBase {
 
 								sendResult(result.out, ++process.executionCount);
 								reply = nteract.createMessage('execute_reply', {
-									parent_header: message.header,
+									parent_header: messageObj.header,
 									content: {
 										status: 'ok',
 										execution_count:  process.executionCount
@@ -369,11 +446,11 @@ export class KernelsApi extends ApiBase {
 								break;
 						}
 					}
-					else if (message.channel === 'control') {
+					else if (messageObj.channel === 'control') {
 						// Either the Jupyter extension doesn't use the control channel yet (December 2022),
 						// or we don't get these messages because the nteract messaging package we use implements too early a version of
 						// the Jupyter Messaging API.
-						switch (message.header.msg_type) {
+						switch (messageObj.header.msg_type) {
 							case 'shutdown_request':
 								break;
 
@@ -384,8 +461,8 @@ export class KernelsApi extends ApiBase {
 								break;
 						}
 					}
-					else if (message.channel === 'iopub') {
-						switch (message.header.msg_type) {
+					else if (messageObj.channel === 'iopub') {
+						switch (messageObj.header.msg_type) {
 							case 'iopub':
 								break;
 
@@ -393,8 +470,8 @@ export class KernelsApi extends ApiBase {
 								break;
 						}
 					}
-					else if (message.channel === 'stdin') {
-						switch (message.header.msg_type) {
+					else if (messageObj.channel === 'stdin') {
+						switch (messageObj.header.msg_type) {
 							case 'input_reply':
 								break;
 
@@ -406,15 +483,16 @@ export class KernelsApi extends ApiBase {
 					if (reply) {
 						reply.header.session = kernelSessionId;
 						reply.header.username = 'iris-jupyter-server';
-						connection.socket.send(JSON.stringify(reply), () => {
-							logChannel.debug(` > Sent reply: ${JSON.stringify(reply)}`);
-							sendStatus('idle');
-						});
+						sendMessage(reply, 'idle');
 					}
 					else {
 						sendStatus('idle');
 					}
 
+				});
+
+				socket.on('error', (error) => {
+					logChannel.debug(`WSget for kernelId '${kernelId}' channels on '${serverNamespace}' error: ${JSON.stringify(error)}`);
 				});
 				return;
 			}

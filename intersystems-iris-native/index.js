@@ -17,7 +17,7 @@ if (process.platform == "win32" && process.arch == "x64") {
 	}
 } else if (process.platform == "linux") {
     let distro = getLinuxDistro()
-    logChannel.debug('platform = ' + process.platform + ': ' + distro + ': ' + process.arch);
+    console.log('intersystems-iris-native:index.js(linux): platform = ' + process.platform + ': ' + distro + ': ' + process.arch);
     if (distro == 'ubuntu') {
         if (process.arch == "x64") {
             native = require('./bin/lnxubuntux64/irisnative.node');
