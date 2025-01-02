@@ -35,21 +35,11 @@ jobs:
             ISC_PLATFORM: macx64
           - platarch: darwin-arm64
             ISC_PLATFORM: macos
-    outputs:
-      taggedbranch: ${{ steps.find-branch.outputs.taggedbranch }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
       - name: Fetch tags
         run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
-      - name: Find which branch the release tag points at
-        id: find-branch
-        if: github.event_name == 'release' && matrix.platarch == 'LinuxTODO'
-        run: |
-          git fetch --depth=1 origin +refs/heads/*:refs/heads/*
-          set -x
-          TAGGEDBRANCH=$(git for-each-ref --points-at=${{github.sha}} --format='%(refname:lstrip=2)' refs/heads/)
-          echo "taggedbranch=$TAGGEDBRANCH" >> $GITHUB_OUTPUT
       - name: Set package name and version
         id: set-version
         run: |
@@ -127,7 +117,7 @@ jobs:
           prerelease: ${{ github.event_name != 'release' }}
           files: '**/*.vsix'
           token: ${{ secrets.GITHUB_TOKEN }}
-  
+
   publish:
     runs-on: ubuntu-latest
     needs: build
