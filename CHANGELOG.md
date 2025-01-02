@@ -1,3 +1,6 @@
+## 0.1.0 (02-Jan-2025)
+- Simplify connection workflow (#14).
+
 ## 0.0.6 (21-Sep-2023)
 - Fix CodeExecutor class load issue.
 
