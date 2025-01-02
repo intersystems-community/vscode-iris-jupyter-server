@@ -1,3 +1,6 @@
+## 0.1.1 (02-Jan-2025)
+- Fix release CI.
+
 ## 0.1.0 (02-Jan-2025)
 - Simplify connection workflow (#14).
 
