@@ -84,7 +84,7 @@ export abstract class ApiBase {
 					return { server: '', namespace: ''};
 				}
 
-				let serverName = parts[0].toLowerCase();
+				let serverName = parts[0];
 				let namespace = parts[1].toUpperCase();
 
 				// Check existence of server-side support class, and install it if absent
@@ -133,7 +133,8 @@ export abstract class ApiBase {
 					}
 					return { server: serverName, namespace, serverSpec };
 				}
-				if (serverName === '') {
+				const asFolderPointer = serverName.match(/@(.+)/);
+				if (serverName === '' || asFolderPointer) {
 
 					const getObjectScriptAPI = (async(): Promise<any> => {
 						const targetExtension = vscode.extensions.getExtension("intersystems-community.vscode-objectscript");
@@ -154,7 +155,14 @@ export abstract class ApiBase {
 					if (!osAPI) {
 						throw new Error('Missing intersystems-community.vscode-objectscript API');
 					}
-					const osServer = osAPI.serverForUri();
+					let folderUri: vscode.Uri | undefined;
+					if (asFolderPointer) {
+						const workspaceFolder = vscode.workspace.workspaceFolders?.find((folder) => folder.name === asFolderPointer[1]);
+						if (workspaceFolder) {
+							folderUri = workspaceFolder.uri;
+						}
+					}
+					const osServer = osAPI.asyncServerForUri ? (await osAPI.asyncServerForUri(folderUri)) : osAPI.serverForUri(folderUri);
 					if (!osServer) {
 						throw new Error('Missing objectscript.conn');
 					}
@@ -170,6 +178,10 @@ export abstract class ApiBase {
 						  port: osServer.port,
 						  pathPrefix: osServer.pathPrefix,
 						  scheme: osServer.scheme
+						},
+						superServer: {
+						  host: osServer.host,
+						  port: osServer.superserverPort
 						}
 					};
 					if (namespace === '') {

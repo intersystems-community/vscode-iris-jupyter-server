@@ -102,8 +102,12 @@ export async function activate(context: vscode.ExtensionContext) {
 		{
 			provideJupyterServers: () => {
 				const servers: JupyterServer[] = [];
-				const scope = vscode.window.activeNotebookEditor?.notebook.uri;
-				const hosts = vscode.workspace.getConfiguration('iris-jupyter-server', scope).get<{ enabled: boolean }[]>('hosts');
+				const uri = vscode.window.activeNotebookEditor?.notebook.uri;
+				let folder = uri ? vscode.workspace.getWorkspaceFolder(uri) : undefined;
+				if (!folder) {
+					folder = vscode.workspace.workspaceFolders?.[0];
+				}
+				const hosts = vscode.workspace.getConfiguration('iris-jupyter-server', folder).get<{ enabled: boolean }[]>('hosts');
 				if (typeof hosts === 'object' && hosts) {
 					for (const key in hosts) {
 						if (hosts[key].enabled === false) {
@@ -112,10 +116,22 @@ export async function activate(context: vscode.ExtensionContext) {
 						servers.push(jupyterServer(key));
 					}
 				}
-				const objectscriptConn = vscode.workspace.getConfiguration('objectscript', scope).get<{ active: boolean, ns: string, server: string, host: string, port: number, username: string, password: string, }>('conn');
+				const objectscriptConn = vscode.workspace.getConfiguration('objectscript', folder).get<{ active: boolean, ns: string, server: string, host: string, port: number, username: string, password: string, "docker-compose": { service: string }, } >('conn');
 				if (objectscriptConn?.active && objectscriptConn.ns) {
-					const { ns, server, host, port, username, password } = objectscriptConn;
-					if (server && ns) {
+					const { ns, server, host, port, username, password, "docker-compose": dockerCompose } = objectscriptConn;
+					if (dockerCompose?.service) {
+						let serverNamespace = ':';
+						let label = `docker:${dockerCompose.service}`;
+						if (folder) {
+							const index = folder.index;
+							serverNamespace = `@${folder.name}:`;
+							if ((vscode.workspace.workspaceFolders?.length ?? 0)  > 1) {
+								label = `${label}@${folder.name}`;
+							}
+						}
+						servers.push(jupyterServer(serverNamespace, `[${label}]:${ns.toUpperCase()}`));
+					}
+					else if (server && ns) {
 						const serverNamespace = `${server}:${ns.toUpperCase()}`;
 						if (!servers.find((server) => server.label === serverNamespace)) {
 							servers.push(jupyterServer(serverNamespace, `[${server}]:${ns.toUpperCase()}`));
