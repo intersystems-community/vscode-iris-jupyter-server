@@ -5,12 +5,13 @@ This VS Code extension leverages [Microsoft's Jupyter extension](https://marketp
 ## Getting Started
 
 1. Install the extension. This will also install the Jupyter and ObjectScript extension packs if you don't already have them.
+> On macOS you will also need OpenSSL 3, which you can install using Homebrew: https://formulae.brew.sh/formula/openssl@3
 2. Use [InterSystems Server Manager](https://marketplace.visualstudio.com/items?itemName=intersystems-community.servermanager) to define a connection to an IRIS server.
 > **Note:** IRIS developers who already use the `objectscript.conn` settings object and don't want to adopt Server Manager's `intersystems.servers` object for their server definitions are not required to do so. However `objectscript.conn` must contain values for `username` and `password`. Switching to use Server Manager would mean that plaintext password could be avoided.
 3. From VS Code's `File` menu select `New File...`. This option is also available on the Welcome page.
 4. When a quickpick appears, choose `Jupyter Notebook`.
 5. Click the button in the upper right of the notebook captioned `Detecting Kernels` or `Select Kernel`.
-6. If the next picker is titled 'Select Kernel' choose `IRIS Notebook Servers...`. Otherwise choose `Select Another Kernel...`, then choose `IRIS Notebook Servers...` from that picker.
+6. If the next picker is titled "Select Kernel" choose `IRIS Notebook Servers...`. Otherwise choose `Select Another Kernel...`, then choose `IRIS Notebook Servers...` from that picker.
 7. The first time you use the extension you will be taken directly to the next step below (#8). On subsequent uses you are asked to "Select a Jupyter Server" and can pick a previously-used _server:NAMESPACE_ entry, then proceed at step #11 below. Alternatively choose `Add IRIS Notebook Host...` and proceed at step #8.
 8. On the "Choose IRIS Server" quickpick, choose your target.
 9. On the next quickpick choose your target namespace.
