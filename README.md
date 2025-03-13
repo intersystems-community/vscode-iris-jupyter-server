@@ -15,13 +15,13 @@ This VS Code extension leverages [Microsoft's Jupyter extension](https://marketp
 7. The first time you use the extension you will be taken directly to the next step below (#8). On subsequent uses you are asked to "Select a Jupyter Server" and can pick a previously-used _server:NAMESPACE_ entry, then proceed at step #11 below. Alternatively choose `Add IRIS Notebook Host...` and proceed at step #8.
 8. On the "Choose IRIS Server" quickpick, choose your target.
 9. On the next quickpick choose your target namespace.
-10.  When you connect a notebook to a namespace for the first time you will be asked to allow the installation of a support class named `PolyglotKernel.CodeExecutor`. Choose `Yes`.
+10. When you connect a notebook to a namespace for the first time you will be asked to allow the installation of a support class named `PolyglotKernel.CodeExecutor`. Choose `Yes`.
 > **Tip:** To avoid having to load this class into other namespaces on the same server you can add a %ALL package mapping of the `PolyglotKernel` package to the default code database of the namespace you initially connected to.
-11.  On the kernel selector, choose the `IRIS ObjectScript INT` kernel.
-12.  The kernel indicator in the upper right of the notebook will display your choice, and the initial notebook cell will show the corresponding language (ObjectScript INT) in the lower right corner.
-13.  Starting with a single-space indent, enter an ObjectScript command in the cell, e.g. `write $zversion,!,$namespace,!,$job,!` and click the Execute Cell button on the left. The output from the command will appear below the cell.
+11. On the kernel selector, choose the `IRIS ObjectScript INT` kernel.
+12. The kernel indicator in the upper right of the notebook will display your choice, and the initial notebook cell will show the corresponding language (ObjectScript INT) in the lower right corner.
+13. Starting with a single-space indent, enter an ObjectScript command in the cell, e.g. `write $zversion,!,$namespace,!,$job,!` and click the Execute Cell button on the left. The output from the command will appear below the cell.
 > **Tip:** If you forget to start the line with a space it won't be syntax-colored correctly but it will still execute.
-14.  Cells can contain more than one line of code, so the above example could be rewritten as:
+14. Cells can contain more than one line of code, so the above example could be rewritten as:
 ```objectscript
  write $zversion,!
  write $namespace,!
