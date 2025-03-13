@@ -8,20 +8,20 @@ This VS Code extension leverages [Microsoft's Jupyter extension](https://marketp
 > On macOS you will also need OpenSSL 3, which you can install using Homebrew: https://formulae.brew.sh/formula/openssl@3
 2. Use [InterSystems Server Manager](https://marketplace.visualstudio.com/items?itemName=intersystems-community.servermanager) to define a connection to an IRIS server.
 > **Note:** IRIS developers who already use the `objectscript.conn` settings object and don't want to adopt Server Manager's `intersystems.servers` object for their server definitions are not required to do so. However `objectscript.conn` must contain values for `username` and `password`. Switching to use Server Manager would mean that plaintext password could be avoided.
-1. From VS Code's `File` menu select `New File...`. This option is also available on the Welcome page.
-2. When a quickpick appears, choose `Jupyter Notebook`.
-3. Click the button in the upper right of the notebook captioned `Detecting Kernels` or `Select Kernel`.
-4. If the next picker is titled 'Select Kernel' choose `IRIS Notebook Servers...`. Otherwise choose `Select Another Kernel...`, then choose `IRIS Notebook Servers...` from that picker.
-5. The first time you use the extension you will be taken directly to the next step below (#8). On subsequent uses you are asked to "Select a Jupyter Server" and can pick a previously-used _server:NAMESPACE_ entry, then proceed at step #11 below. Alternatively choose `Add IRIS Notebook Host...` and proceed at step #8.
-6. On the "Choose IRIS Server" quickpick, choose your target.
-7. On the next quickpick choose your target namespace.
-8.  When you connect a notebook to a namespace for the first time you will be asked to allow the installation of a support class named `PolyglotKernel.CodeExecutor`. Choose `Yes`.
+3. From VS Code's `File` menu select `New File...`. This option is also available on the Welcome page.
+4. When a quickpick appears, choose `Jupyter Notebook`.
+5. Click the button in the upper right of the notebook captioned `Detecting Kernels` or `Select Kernel`.
+6. If the next picker is titled "Select Kernel" choose `IRIS Notebook Servers...`. Otherwise choose `Select Another Kernel...`, then choose `IRIS Notebook Servers...` from that picker.
+7. The first time you use the extension you will be taken directly to the next step below (#8). On subsequent uses you are asked to "Select a Jupyter Server" and can pick a previously-used _server:NAMESPACE_ entry, then proceed at step #11 below. Alternatively choose `Add IRIS Notebook Host...` and proceed at step #8.
+8. On the "Choose IRIS Server" quickpick, choose your target.
+9. On the next quickpick choose your target namespace.
+10.  When you connect a notebook to a namespace for the first time you will be asked to allow the installation of a support class named `PolyglotKernel.CodeExecutor`. Choose `Yes`.
 > **Tip:** To avoid having to load this class into other namespaces on the same server you can add a %ALL package mapping of the `PolyglotKernel` package to the default code database of the namespace you initially connected to.
-1.  On the kernel selector, choose the `IRIS ObjectScript INT` kernel.
-2.  The kernel indicator in the upper right of the notebook will display your choice, and the initial notebook cell will show the corresponding language (ObjectScript INT) in the lower right corner.
-3.  Starting with a single-space indent, enter an ObjectScript command in the cell, e.g. `write $zversion,!,$namespace,!,$job,!` and click the Execute Cell button on the left. The output from the command will appear below the cell.
+11.  On the kernel selector, choose the `IRIS ObjectScript INT` kernel.
+12.  The kernel indicator in the upper right of the notebook will display your choice, and the initial notebook cell will show the corresponding language (ObjectScript INT) in the lower right corner.
+13.  Starting with a single-space indent, enter an ObjectScript command in the cell, e.g. `write $zversion,!,$namespace,!,$job,!` and click the Execute Cell button on the left. The output from the command will appear below the cell.
 > **Tip:** If you forget to start the line with a space it won't be syntax-colored correctly but it will still execute.
-1.  Cells can contain more than one line of code, so the above example could be rewritten as:
+14.  Cells can contain more than one line of code, so the above example could be rewritten as:
 ```objectscript
  write $zversion,!
  write $namespace,!
