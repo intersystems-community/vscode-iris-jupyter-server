@@ -1,3 +1,7 @@
+## 0.2.0 (02-Apr-2025)
+- Handle `objectscript.conn` that specifies docker-compose object instead of `server` or `host` + `port` (#18).
+- Handle macOS's removal of OpenSSL 1.1 (#21).
+
 ## 0.1.1 (02-Jan-2025)
 - Fix release CI.
 
